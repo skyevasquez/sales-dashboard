@@ -1,0 +1,194 @@
+{
+  "projectId": "",
+  "projectName": "Sales Dashboard",
+  "databases": [
+    {
+      "name": "SalesDashboard",
+      "$id": "sales-dashboard-db",
+      "enabled": true,
+      "collections": [
+        {
+          "name": "stores",
+          "$id": "stores",
+          "enabled": true,
+          "documentSecurity": false,
+          "attributes": [
+            {
+              "key": "name",
+              "type": "string",
+              "size": 255,
+              "required": true,
+              "default": null,
+              "array": false
+            }
+          ],
+          "indexes": [],
+          "$permissions": [
+            "create(\"any\")",
+            "read(\"any\")",
+            "update(\"any\")",
+            "delete(\"any\")"
+          ]
+        },
+        {
+          "name": "kpis",
+          "$id": "kpis",
+          "enabled": true,
+          "documentSecurity": false,
+          "attributes": [
+            {
+              "key": "name",
+              "type": "string",
+              "size": 255,
+              "required": true,
+              "default": null,
+              "array": false
+            }
+          ],
+          "indexes": [],
+          "$permissions": [
+            "create(\"any\")",
+            "read(\"any\")",
+            "update(\"any\")",
+            "delete(\"any\")"
+          ]
+        },
+        {
+          "name": "sales_data",
+          "$id": "sales_data",
+          "enabled": true,
+          "documentSecurity": false,
+          "attributes": [
+            {
+              "key": "storeId",
+              "type": "string",
+              "size": 255,
+              "required": true,
+              "default": null,
+              "array": false
+            },
+            {
+              "key": "kpiId",
+              "type": "string",
+              "size": 255,
+              "required": true,
+              "default": null,
+              "array": false
+            },
+            {
+              "key": "monthlyGoal",
+              "type": "double",
+              "required": true,
+              "default": null,
+              "array": false,
+              "min": null,
+              "max": null
+            },
+            {
+              "key": "mtdSales",
+              "type": "double",
+              "required": true,
+              "default": null,
+              "array": false,
+              "min": null,
+              "max": null
+            }
+          ],
+          "indexes": [
+            {
+              "key": "storeId_kpiId",
+              "type": "unique",
+              "status": "available",
+              "attributes": ["storeId", "kpiId"],
+              "orders": ["ASC", "ASC"]
+            }
+          ],
+          "$permissions": [
+            "create(\"any\")",
+            "read(\"any\")",
+            "update(\"any\")",
+            "delete(\"any\")"
+          ]
+        },
+        {
+          "name": "reports",
+          "$id": "reports",
+          "enabled": true,
+          "documentSecurity": false,
+          "attributes": [
+            {
+              "key": "name",
+              "type": "string",
+              "size": 255,
+              "required": true,
+              "default": null,
+              "array": false
+            },
+            {
+              "key": "createdAt",
+              "type": "string",
+              "size": 255,
+              "required": true,
+              "default": null,
+              "array": false
+            },
+            {
+              "key": "url",
+              "type": "string",
+              "size": 1000,
+              "required": true,
+              "default": null,
+              "array": false
+            },
+            {
+              "key": "storeIds",
+              "type": "string",
+              "size": 255,
+              "required": true,
+              "default": null,
+              "array": true
+            }
+          ],
+          "indexes": [],
+          "$permissions": [
+            "create(\"any\")",
+            "read(\"any\")",
+            "update(\"any\")",
+            "delete(\"any\")"
+          ]
+        },
+        {
+          "name": "snapshots",
+          "$id": "snapshots",
+          "enabled": true,
+          "documentSecurity": false,
+          "attributes": [
+            {
+              "key": "timestamp",
+              "type": "string",
+              "size": 255,
+              "required": true,
+              "default": null,
+              "array": false
+            },
+            {
+              "key": "data",
+              "type": "string",
+              "size": 100000,
+              "required": true,
+              "default": null,
+              "array": false
+            }
+          ],
+          "indexes": [],
+          "$permissions": [
+            "create(\"any\")",
+            "read(\"any\")",
+            "update(\"any\")",
+            "delete(\"any\")"
+          ]
+        }
+      ]
+    }
+  ]
+}
