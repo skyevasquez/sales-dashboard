@@ -58,9 +58,9 @@ export function ImportCsvDialog({ open, onOpenChange, stores, kpis, onImport }: 
       setImportResult({
         success: false,
         message: `Error: ${error instanceof Error ? error.message : String(error)}`,
-        newStores: [],
-        newKpis: [],
-        salesData: [],
+        newStoreNames: [],
+        newKpiNames: [],
+        salesRows: [],
         errors: [],
       })
     } finally {
@@ -162,12 +162,12 @@ export function ImportCsvDialog({ open, onOpenChange, stores, kpis, onImport }: 
               <div className="space-y-2">
                 <p className="text-sm font-medium">Import Summary:</p>
                 <ul className="text-sm space-y-1 list-disc pl-5">
-                  <li>Data points: {importResult.salesData.length}</li>
-                  {importResult.newStores.length > 0 && (
-                    <li>New stores: {importResult.newStores.map((s) => s.name).join(", ")}</li>
+                  <li>Data rows: {importResult.salesRows.length}</li>
+                  {importResult.newStoreNames.length > 0 && (
+                    <li>New stores: {importResult.newStoreNames.join(", ")}</li>
                   )}
-                  {importResult.newKpis.length > 0 && (
-                    <li>New KPIs: {importResult.newKpis.map((k) => k.name).join(", ")}</li>
+                  {importResult.newKpiNames.length > 0 && (
+                    <li>New KPIs: {importResult.newKpiNames.join(", ")}</li>
                   )}
                 </ul>
               </div>
@@ -194,7 +194,7 @@ export function ImportCsvDialog({ open, onOpenChange, stores, kpis, onImport }: 
           </Button>
           <Button
             onClick={handleImport}
-            disabled={!importResult || !importResult.success || importResult.salesData.length === 0}
+            disabled={!importResult || !importResult.success || importResult.salesRows.length === 0}
           >
             Import Data
           </Button>

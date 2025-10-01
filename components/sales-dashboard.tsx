@@ -201,41 +201,39 @@ export function SalesDashboard() {
 
   // Update sales data
   const updateSalesData = async (storeId: string, kpiId: string, field: "monthlyGoal" | "mtdSales", value: number) => {
-    // Optimistically update local state
-    setSalesData((prevSalesData) => {
-      const newSalesData = [...prevSalesData]
-      const dataIndex = newSalesData.findIndex((data) => data.storeId === storeId && data.kpiId === kpiId)
+    let updatedEntry: SalesData | null = null
+    let updatedDataset: SalesData[] = []
+
+    setSalesData((prev) => {
+      const dataIndex = prev.findIndex((data) => data.storeId === storeId && data.kpiId === kpiId)
 
       if (dataIndex >= 0) {
-        newSalesData[dataIndex] = {
-          ...newSalesData[dataIndex],
-          [field]: value,
-        }
-      } else {
-        // Create new entry if it doesn't exist
-        newSalesData.push({
-          storeId,
-          kpiId,
-          monthlyGoal: field === "monthlyGoal" ? value : 0,
-          mtdSales: field === "mtdSales" ? value : 0,
-        })
+        const nextEntry = { ...prev[dataIndex], [field]: value }
+        const nextData = [...prev]
+        nextData[dataIndex] = nextEntry
+        updatedEntry = nextEntry
+        updatedDataset = nextData
+        return nextData
       }
 
-      return newSalesData
-    })
-
-    // Save to Appwrite
-    try {
-      const currentData = salesData.find((data) => data.storeId === storeId && data.kpiId === kpiId)
-      await db.upsertSalesData({
+      const nextEntry: SalesData = {
         storeId,
         kpiId,
-        monthlyGoal: field === "monthlyGoal" ? value : currentData?.monthlyGoal || 0,
-        mtdSales: field === "mtdSales" ? value : currentData?.mtdSales || 0,
-      })
+        monthlyGoal: field === "monthlyGoal" ? value : 0,
+        mtdSales: field === "mtdSales" ? value : 0,
+      }
+      updatedEntry = nextEntry
+      updatedDataset = [...prev, nextEntry]
+      return updatedDataset
+    })
 
-      // Save a historical snapshot when data is updated
-      await db.createSnapshot(salesData)
+    if (!updatedEntry) {
+      return
+    }
+
+    try {
+      await db.upsertSalesData(updatedEntry)
+      await db.createSnapshot(updatedDataset)
     } catch (error) {
       console.error("Error updating sales data:", error)
       toast.error("Failed to update sales data")
@@ -252,6 +250,22 @@ export function SalesDashboard() {
         mtdSales: 0,
       }
     )
+  }
+
+  const mergeSalesDataRecords = (current: SalesData[], updates: SalesData[]) => {
+    if (updates.length === 0) {
+      return current
+    }
+
+    const recordMap = new Map(current.map((entry) => [`${entry.storeId}:${entry.kpiId}`, entry]))
+
+    updates.forEach((update) => {
+      const key = `${update.storeId}:${update.kpiId}`
+      const existing = recordMap.get(key)
+      recordMap.set(key, existing ? { ...existing, ...update } : { ...update })
+    })
+
+    return Array.from(recordMap.values())
   }
 
   // Handle report generation
@@ -274,50 +288,86 @@ export function SalesDashboard() {
   // Handle CSV import
   const handleCsvImport = async (result: CsvImportResult) => {
     try {
-      // Add new stores
-      if (result.newStores.length > 0) {
-        setStores((prev) => [...prev, ...result.newStores])
+      const storeNameMap = new Map(stores.map((store) => [store.name.trim().toLowerCase(), store]))
+      const kpiNameMap = new Map(kpis.map((kpi) => [kpi.name.trim().toLowerCase(), kpi]))
+
+      const createdStores: Store[] = []
+      for (const name of result.newStoreNames) {
+        const trimmedName = name.trim()
+        if (!trimmedName) continue
+        const key = trimmedName.toLowerCase()
+        if (storeNameMap.has(key)) continue
+        const newStore = await db.createStore(trimmedName)
+        createdStores.push(newStore)
+        storeNameMap.set(key, newStore)
       }
 
-      // Add new KPIs
-      if (result.newKpis.length > 0) {
-        setKpis((prev) => [...prev, ...result.newKpis])
-      }
-
-      // Update sales data in Appwrite
-      for (const importedData of result.salesData) {
-        await db.upsertSalesData(importedData)
-      }
-
-      // Update local state
-      setSalesData((prev) => {
-        const newData = [...prev]
-
-        // Process each imported data point
-        result.salesData.forEach((importedData) => {
-          const existingIndex = newData.findIndex(
-            (data) => data.storeId === importedData.storeId && data.kpiId === importedData.kpiId,
-          )
-
-          if (existingIndex >= 0) {
-            // Update existing data
-            newData[existingIndex] = {
-              ...newData[existingIndex],
-              monthlyGoal: importedData.monthlyGoal,
-              mtdSales: importedData.mtdSales,
-            }
-          } else {
-            // Add new data
-            newData.push(importedData)
-          }
+      if (createdStores.length > 0) {
+        setStores((prev) => {
+          const existingIds = new Set(prev.map((store) => store.id))
+          const additions = createdStores.filter((store) => !existingIds.has(store.id))
+          return additions.length > 0 ? [...prev, ...additions] : prev
         })
+      }
 
-        return newData
+      const createdKpis: Kpi[] = []
+      for (const name of result.newKpiNames) {
+        const trimmedName = name.trim()
+        if (!trimmedName) continue
+        const key = trimmedName.toLowerCase()
+        if (kpiNameMap.has(key)) continue
+        const newKpi = await db.createKpi(trimmedName)
+        createdKpis.push(newKpi)
+        kpiNameMap.set(key, newKpi)
+      }
+
+      if (createdKpis.length > 0) {
+        setKpis((prev) => {
+          const existingIds = new Set(prev.map((kpi) => kpi.id))
+          const additions = createdKpis.filter((kpi) => !existingIds.has(kpi.id))
+          return additions.length > 0 ? [...prev, ...additions] : prev
+        })
+      }
+
+      const salesUpdates: SalesData[] = []
+
+      result.salesRows.forEach((row, index) => {
+        const store = storeNameMap.get(row.storeName.trim().toLowerCase())
+        const kpi = kpiNameMap.get(row.kpiName.trim().toLowerCase())
+
+        if (!store || !kpi) {
+          console.warn(
+            `Skipping CSV row ${index + 2}: unable to resolve store "${row.storeName}" and KPI "${row.kpiName}"`,
+          )
+          return
+        }
+
+        salesUpdates.push({
+          storeId: store.id,
+          kpiId: kpi.id,
+          monthlyGoal: row.monthlyGoal,
+          mtdSales: row.mtdSales,
+        })
       })
 
-      // Save a historical snapshot after import
-      await db.createSnapshot(salesData)
-      toast.success("Data imported successfully")
+      if (salesUpdates.length === 0) {
+        toast.error("No valid rows found to import after resolving stores and KPIs")
+        return
+      }
+
+      await Promise.all(salesUpdates.map((entry) => db.upsertSalesData(entry)))
+
+      let mergedData: SalesData[] = []
+      setSalesData((prev) => {
+        mergedData = mergeSalesDataRecords(prev, salesUpdates)
+        return mergedData
+      })
+
+      if (mergedData.length > 0) {
+        await db.createSnapshot(mergedData)
+      }
+
+      toast.success(result.message || "Data imported successfully")
     } catch (error) {
       console.error("Error importing data:", error)
       toast.error("Failed to import data")

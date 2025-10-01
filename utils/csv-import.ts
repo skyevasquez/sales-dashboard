@@ -1,12 +1,20 @@
-import type { Store, Kpi, SalesData } from "@/components/sales-dashboard"
+import type { Store, Kpi } from "@/components/sales-dashboard"
+
+// Parsed representation of an individual CSV row prior to persistence
+export interface ParsedSalesRow {
+  storeName: string
+  kpiName: string
+  monthlyGoal: number
+  mtdSales: number
+}
 
 // Interface for CSV import results
 export interface CsvImportResult {
   success: boolean
   message: string
-  newStores: Store[]
-  newKpis: Kpi[]
-  salesData: SalesData[]
+  newStoreNames: string[]
+  newKpiNames: string[]
+  salesRows: ParsedSalesRow[]
   errors: string[]
 }
 
@@ -15,9 +23,9 @@ export function parseSalesCsv(csvContent: string, existingStores: Store[], exist
   const result: CsvImportResult = {
     success: false,
     message: "",
-    newStores: [],
-    newKpis: [],
-    salesData: [],
+    newStoreNames: [],
+    newKpiNames: [],
+    salesRows: [],
     errors: [],
   }
 
@@ -43,8 +51,10 @@ export function parseSalesCsv(csvContent: string, existingStores: Store[], exist
     }
 
     // Create maps for existing stores and KPIs for quick lookup
-    const storeMap = new Map(existingStores.map((store) => [store.name.toLowerCase(), store]))
-    const kpiMap = new Map(existingKpis.map((kpi) => [kpi.name.toLowerCase(), kpi]))
+    const storeMap = new Map(existingStores.map((store) => [store.name.trim().toLowerCase(), store]))
+    const kpiMap = new Map(existingKpis.map((kpi) => [kpi.name.trim().toLowerCase(), kpi]))
+    const newStoreNameMap = new Map<string, string>()
+    const newKpiNameMap = new Map<string, string>()
 
     // Process data rows
     for (let i = 1; i < lines.length; i++) {
@@ -60,8 +70,10 @@ export function parseSalesCsv(csvContent: string, existingStores: Store[], exist
       }
 
       // Extract values
-      const storeName = values[headers.indexOf("Store")]
-      const kpiName = values[headers.indexOf("KPI")]
+      const storeNameRaw = values[headers.indexOf("Store")]
+      const kpiNameRaw = values[headers.indexOf("KPI")]
+      const storeName = storeNameRaw.trim()
+      const kpiName = kpiNameRaw.trim()
       const monthlyGoalStr = values[headers.indexOf("Monthly Goal")]
       const mtdSalesStr = values[headers.indexOf("MTD Sales")]
 
@@ -89,55 +101,38 @@ export function parseSalesCsv(csvContent: string, existingStores: Store[], exist
       }
 
       // Find or create store
-      let storeId: string
       const storeKey = storeName.toLowerCase()
-      if (storeMap.has(storeKey)) {
-        storeId = storeMap.get(storeKey)!.id
-      } else {
-        // Create a new store
-        const newStore: Store = {
-          id: `store-${Date.now()}-${result.newStores.length}`,
-          name: storeName,
-        }
-        result.newStores.push(newStore)
-        storeMap.set(storeKey, newStore)
-        storeId = newStore.id
-      }
-
-      // Find or create KPI
-      let kpiId: string
       const kpiKey = kpiName.toLowerCase()
-      if (kpiMap.has(kpiKey)) {
-        kpiId = kpiMap.get(kpiKey)!.id
-      } else {
-        // Create a new KPI
-        const newKpi: Kpi = {
-          id: `kpi-${Date.now()}-${result.newKpis.length}`,
-          name: kpiName,
-        }
-        result.newKpis.push(newKpi)
-        kpiMap.set(kpiKey, newKpi)
-        kpiId = newKpi.id
+
+      if (!storeMap.has(storeKey) && !newStoreNameMap.has(storeKey)) {
+        newStoreNameMap.set(storeKey, storeName)
       }
 
-      // Add sales data
-      result.salesData.push({
-        storeId,
-        kpiId,
+      if (!kpiMap.has(kpiKey) && !newKpiNameMap.has(kpiKey)) {
+        newKpiNameMap.set(kpiKey, kpiName)
+      }
+
+      const resolvedStoreName = storeMap.get(storeKey)?.name ?? newStoreNameMap.get(storeKey) ?? storeName
+      const resolvedKpiName = kpiMap.get(kpiKey)?.name ?? newKpiNameMap.get(kpiKey) ?? kpiName
+
+      // Add sales data row with human-friendly names; IDs will be resolved during import
+      result.salesRows.push({
+        storeName: resolvedStoreName,
+        kpiName: resolvedKpiName,
         monthlyGoal,
         mtdSales,
       })
     }
 
     // Set success if we have any valid data
-    if (result.salesData.length > 0) {
+    if (result.salesRows.length > 0) {
       result.success = true
-      result.message = `Successfully imported ${result.salesData.length} data points`
-      if (result.newStores.length > 0) {
-        result.message += `, created ${result.newStores.length} new stores`
+      result.message = `Successfully validated ${result.salesRows.length} data rows`
+      if (newStoreNameMap.size > 0) {
+        result.message += `, detected ${newStoreNameMap.size} new stores`
       }
-      if (result.newKpis.length > 0) {
-        result.message += `, created ${result.newKpis.length} new KPIs`
+      if (newKpiNameMap.size > 0) {
+        result.message += `, detected ${newKpiNameMap.size} new KPIs`
       }
       if (result.errors.length > 0) {
         result.message += ` with ${result.errors.length} errors`
@@ -146,6 +141,9 @@ export function parseSalesCsv(csvContent: string, existingStores: Store[], exist
       result.success = false
       result.message = "No valid data found in the CSV file"
     }
+
+    result.newStoreNames = Array.from(newStoreNameMap.values())
+    result.newKpiNames = Array.from(newKpiNameMap.values())
 
     return result
   } catch (error) {
