@@ -1,4 +1,6 @@
-# Appwrite Database Setup Guide
+# Appwrite Database Setup Guide (Legacy)
+
+This setup is retained for legacy workflows. The current runtime backend uses Convex + Better Auth.
 
 This guide will walk you through setting up your Appwrite database for the Sales Dashboard.
 

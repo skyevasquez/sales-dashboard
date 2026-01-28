@@ -18,6 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { generateReport } from "@/app/actions/report-actions"
 import type { Store, Kpi, SalesData } from "./sales-dashboard"
 import type { Report } from "@/app/actions/report-actions"
+import type { Id } from "@/convex/_generated/dataModel"
 
 interface GenerateReportDialogProps {
   open: boolean
@@ -43,7 +44,7 @@ export function GenerateReportDialog({
   onReportGenerated,
 }: GenerateReportDialogProps) {
   const [reportName, setReportName] = useState(`Sales Report - ${new Date().toLocaleDateString()}`)
-  const [selectedStores, setSelectedStores] = useState<string[]>([])
+  const [selectedStores, setSelectedStores] = useState<Id<"stores">[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,7 +70,7 @@ export function GenerateReportDialog({
     }
   }
 
-  const toggleStore = (storeId: string) => {
+  const toggleStore = (storeId: Id<"stores">) => {
     setSelectedStores((prev) => (prev.includes(storeId) ? prev.filter((id) => id !== storeId) : [...prev, storeId]))
   }
 

@@ -1,11 +1,11 @@
 ╔══════════════════════════════════════════════════════════════╗
-║          🔐 APPWRITE AUTHENTICATION - QUICK GUIDE           ║
+║             🔐 BETTER AUTH - QUICK GUIDE                    ║
 ╔══════════════════════════════════════════════════════════════╗
 
 ✅ SETUP COMPLETE!
 
-📦 What was installed:
-   • AuthContext (React Context for auth state)
+📦 What is enabled:
+   • Better Auth client (authClient)
    • Login & Register forms
    • Protected route wrapper
    • User menu with logout
@@ -13,32 +13,33 @@
 
 🚀 TRY IT NOW:
 
-1. Start dev server:
+1. Start Convex dev server:
+   $ npx convex dev
+
+2. Start Next.js dev server:
    $ npm run dev
 
-2. Open browser:
+3. Open browser:
    → http://localhost:3000
 
-3. Create account:
+4. Create account:
    • Click "Sign up"
    • Enter name, email, password
    • Submit form
 
-4. You're in! 
+5. You're in!
    • Dashboard loads automatically
    • User menu appears in top-right
    • Click avatar to logout
 
 🔧 USE IN YOUR CODE:
 
-   import { useAuth } from "@/context/AuthContext";
-   
-   const { user, login, logout } = useAuth();
+   import { authClient } from "@/lib/auth-client";
+   const { data: session, isPending } = authClient.useSession();
 
 🛡️ PROTECT A PAGE:
 
    import { ProtectedRoute } from "@/components/auth/protected-route";
-   
    <ProtectedRoute>
      <YourComponent />
    </ProtectedRoute>
@@ -46,8 +47,5 @@
 📚 MORE INFO:
    • Full guide: AUTH_README.md
    • Summary: AUTH_SETUP_SUMMARY.md
-
-🌐 MANAGE USERS:
-   https://cloud.appwrite.io/console/project-68dd4ee79b68d5f85be7/auth
 
 ══════════════════════════════════════════════════════════════

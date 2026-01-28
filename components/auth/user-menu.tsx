@@ -1,6 +1,8 @@
 "use client";
 
-import { useAuth } from "@/context/AuthContext";
+import { authClient } from "@/lib/auth-client";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,13 +13,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, User } from "lucide-react";
+import { LogOut, User, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export function UserMenu() {
-  const { user, logout } = useAuth();
+  const { data: session } = authClient.useSession();
+  const role = useQuery(api.appRoles.getMyRole);
   const router = useRouter();
 
+  const user = session?.user;
   if (!user) return null;
 
   const initials = user.name
@@ -31,7 +36,7 @@ export function UserMenu() {
 
   async function handleLogout() {
     try {
-      await logout();
+      await authClient.signOut();
       router.push("/auth");
     } catch (error) {
       console.error("Logout failed:", error);
@@ -41,7 +46,7 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+        <Button variant="ghost" className="relative h-10 w-10 rounded-full" aria-label="Open user menu">
           <Avatar className="h-10 w-10">
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
@@ -52,9 +57,20 @@ export function UserMenu() {
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{user.name || "User"}</p>
             <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+            {role && (
+              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80 pt-0.5">
+                {role.replace("_", " ")}
+              </p>
+            )}
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/account" className="cursor-pointer">
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Account Settings</span>
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>

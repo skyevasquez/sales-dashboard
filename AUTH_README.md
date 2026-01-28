@@ -1,6 +1,6 @@
 # 🔐 Authentication Setup
 
-This application uses **Appwrite** for authentication and user management.
+This application uses **Better Auth** with **Convex** for authentication and session management.
 
 ## Features
 
@@ -13,22 +13,29 @@ This application uses **Appwrite** for authentication and user management.
 
 ## Configuration
 
-Authentication is configured using environment variables in `.env.local`:
+Authentication relies on Convex + Better Auth configuration. Ensure `.env.local` contains:
 
 ```env
-NEXT_PUBLIC_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
-NEXT_PUBLIC_APPWRITE_PROJECT_ID=68dd4ee79b68d5f85be7
+NEXT_PUBLIC_CONVEX_URL=your_convex_url
+NEXT_PUBLIC_CONVEX_SITE_URL=http://localhost:3000
+SITE_URL=http://localhost:3000
 ```
+
+`SITE_URL` defaults to `http://localhost:3000` in `convex/auth.ts` if not provided.
 
 ## Components
 
-### Auth Context (`context/AuthContext.tsx`)
-Provides authentication state and methods throughout the app:
-- `user` - Current authenticated user
-- `loading` - Loading state
-- `login(email, password)` - Sign in user
-- `register(email, password, name)` - Create new account
-- `logout()` - Sign out user
+### Auth Client (`lib/auth-client.ts`)
+Provides the Better Auth React client:
+- `authClient.useSession()`
+- `authClient.signIn.email()`
+- `authClient.signUp.email()`
+- `authClient.signOut()`
+
+### Auth Server (`lib/auth-server.ts`)
+Server helpers used by API routes and server actions:
+- `handler` (GET/POST for `/api/auth/[...all]`)
+- `fetchAuthQuery`, `fetchAuthMutation`
 
 ### Auth Pages & Components
 
@@ -39,7 +46,6 @@ Provides authentication state and methods throughout the app:
 2. **Register Form** (`components/auth/register-form.tsx`)
    - New account creation
    - Password confirmation
-   - Automatic login after registration
 
 3. **Protected Route** (`components/auth/protected-route.tsx`)
    - Wraps pages that require authentication
@@ -75,49 +81,48 @@ export default function MyPage() {
 ```tsx
 "use client";
 
-import { useAuth } from "@/context/AuthContext";
+import { authClient } from "@/lib/auth-client";
 
 export function MyComponent() {
-  const { user, logout } = useAuth();
+  const { data: session, isPending } = authClient.useSession();
 
-  return (
-    <div>
-      <p>Welcome, {user?.name}!</p>
-      <button onClick={logout}>Logout</button>
-    </div>
-  );
+  if (isPending) return <div>Loading...</div>;
+  if (!session) return <div>Please log in</div>;
+
+  return <div>Welcome {session.user?.name ?? session.user?.email}!</div>;
 }
 ```
 
-### Check Authentication
+### Sign In
 
-```tsx
-const { user, loading } = useAuth();
+```ts
+await authClient.signIn.email({
+  email,
+  password,
+});
+```
 
-if (loading) return <div>Loading...</div>;
-if (!user) return <div>Please log in</div>;
+### Sign Up
 
-return <div>Welcome {user.name}!</div>;
+```ts
+await authClient.signUp.email({
+  email,
+  password,
+  name,
+});
+```
+
+### Sign Out
+
+```ts
+await authClient.signOut();
 ```
 
 ## Routes
 
 - `/` - Main dashboard (protected)
 - `/auth` - Login/Register page (public)
-
-## Appwrite Console
-
-Manage users and auth settings in the Appwrite Console:
-https://cloud.appwrite.io/console/project-68dd4ee79b68d5f85be7/auth
-
-## Security Features
-
-- Password minimum length: 8 characters
-- Session-based authentication
-- Automatic session validation
-- Secure logout (deletes session)
-- Client-side protection (redirects)
-- Server-side validation (API routes use API key)
+- `/api/auth/[...all]` - Better Auth route handler
 
 ## Testing
 
@@ -125,12 +130,8 @@ https://cloud.appwrite.io/console/project-68dd4ee79b68d5f85be7/auth
 
 1. Start the dev server: `npm run dev`
 2. Navigate to: http://localhost:3000/auth
-3. Click "Sign up" 
-4. Enter your details:
-   - Name: Test User
-   - Email: test@example.com
-   - Password: testpassword123
-5. Submit the form
+3. Click "Sign up"
+4. Enter your details and submit
 
 ### Login
 
@@ -138,31 +139,19 @@ https://cloud.appwrite.io/console/project-68dd4ee79b68d5f85be7/auth
 2. Enter credentials
 3. Click "Sign In"
 
-You'll be automatically redirected to the dashboard after successful authentication.
+You will be redirected to the dashboard after successful authentication.
 
 ## Troubleshooting
 
-### "User not found" error
-- Make sure you've created an account first
-- Check that you're using the correct email/password
-
 ### Redirecting to /auth constantly
 - Clear browser cookies
-- Check Appwrite session in Application tab (DevTools)
-- Verify environment variables are set correctly
+- Verify `NEXT_PUBLIC_CONVEX_URL` and `NEXT_PUBLIC_CONVEX_SITE_URL`
+- Ensure `npx convex dev` is running
 
 ### Can't create account
 - Verify email format is valid
 - Ensure password is at least 8 characters
-- Check Appwrite Console for any error messages
 
-## Next Steps
+## Legacy Appwrite Auth
 
-Optional enhancements you can add:
-
-- [ ] Email verification
-- [ ] Password reset flow
-- [ ] OAuth providers (Google, GitHub, etc.)
-- [ ] Two-factor authentication
-- [ ] User profile editing
-- [ ] Role-based access control
+Appwrite auth docs are still present for legacy setup scripts. See `APPWRITE_SETUP.md` for legacy details.

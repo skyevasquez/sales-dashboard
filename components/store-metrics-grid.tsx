@@ -95,7 +95,7 @@ export function StoreMetricsGrid({
                                 : "text-gray-500"
                           }`}
                         >
-                          <StatusIcon className="h-4 w-4 mr-1" />
+                          <StatusIcon className="h-4 w-4 mr-1" aria-label={status === "ahead" ? "Ahead of goal" : status === "behind" ? "Behind goal" : "On track"} />
                         </span>
                       </CardTitle>
                     </CardHeader>
@@ -103,11 +103,11 @@ export function StoreMetricsGrid({
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <p className="text-xs text-muted-foreground">Monthly Goal</p>
-                          <p className="text-sm font-medium">{data.monthlyGoal.toLocaleString()}</p>
+                          <p className="text-sm font-medium" suppressHydrationWarning>{data.monthlyGoal.toLocaleString()}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">MTD Sales</p>
-                          <p className="text-sm font-medium">{data.mtdSales.toLocaleString()}</p>
+                          <p className="text-sm font-medium" suppressHydrationWarning>{data.mtdSales.toLocaleString()}</p>
                         </div>
                       </div>
 
@@ -129,13 +129,13 @@ export function StoreMetricsGrid({
                       <div className="grid grid-cols-2 gap-2 pt-2">
                         <div>
                           <p className="text-xs text-muted-foreground">Projected</p>
-                          <p className="text-sm font-medium">
+                          <p className="text-sm font-medium" suppressHydrationWarning>
                             {projection.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Daily Target</p>
-                          <p className="text-sm font-medium">
+                          <p className="text-sm font-medium" suppressHydrationWarning>
                             {dailyTarget.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </p>
                         </div>

@@ -48,10 +48,11 @@ export function AddStoreDialog({ open, onOpenChange, onAdd }: AddStoreDialogProp
               </Label>
               <Input
                 id="store-name"
+                name="storeName"
                 value={storeName}
                 onChange={(e) => setStoreName(e.target.value)}
                 className="col-span-3"
-                autoFocus
+                autoComplete="off"
               />
             </div>
           </div>

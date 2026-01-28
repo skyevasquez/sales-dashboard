@@ -2,17 +2,27 @@
 
 import { put } from "@vercel/blob"
 import { jsPDF } from "jspdf"
-import { ID } from "appwrite"
-import { getDatabases, APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_REPORTS_ID } from "@/lib/appwrite"
 import type { Store, Kpi, SalesData } from "@/components/sales-dashboard"
+import type { Id } from "@/convex/_generated/dataModel"
+import { api } from "@/convex/_generated/api"
+import { fetchAuthMutation, fetchAuthQuery } from "@/lib/auth-server"
 
 // Type for our report metadata
 export interface Report {
-  id: string
+  id: Id<"reports">
   name: string
   createdAt: string
   url: string
-  storeIds: string[]
+  storeIds: Id<"stores">[]
+}
+
+async function resolveOrgId() {
+  const organizations = await fetchAuthQuery(api.organizations.listOrganizations, {})
+  const orgId = organizations?.[0]?._id ?? null
+  if (!orgId) {
+    throw new Error("Organization not found")
+  }
+  return orgId
 }
 
 // Function to generate a PDF report and store it in Vercel Blob
@@ -107,33 +117,27 @@ export async function generateReport(
     const pdfBlob = new Blob([doc.output("blob")], { type: "application/pdf" })
 
     // Generate a unique filename
-    const reportId = `report-${Date.now()}`
-    const filename = `${reportId}.pdf`
+    const reportFileId = `report-${Date.now()}`
+    const filename = `${reportFileId}.pdf`
 
     // Upload to Vercel Blob
     const { url } = await put(filename, pdfBlob, { access: "public" })
 
-    // Save report metadata to Appwrite
-    const databases = getDatabases()
-    const reportDoc = await databases.createDocument(
-      APPWRITE_DATABASE_ID,
-      APPWRITE_COLLECTION_REPORTS_ID,
-      ID.unique(),
-      {
-        name: reportName,
-        createdAt: new Date().toISOString(),
-        url,
-        storeIds: selectedStoreIds,
-      },
-    )
+    const orgId = await resolveOrgId()
+    const createdAt = new Date().toISOString()
+    const reportId = await fetchAuthMutation(api.reports.createReport, {
+      orgId,
+      name: reportName,
+      url,
+      storeIds: selectedStoreIds as Id<"stores">[],
+    })
 
-    // Create report metadata
     const report: Report = {
-      id: reportDoc.$id,
-      name: reportDoc.name,
-      createdAt: reportDoc.createdAt,
-      url: reportDoc.url,
-      storeIds: reportDoc.storeIds || [],
+      id: reportId,
+      name: reportName,
+      createdAt,
+      url,
+      storeIds: selectedStoreIds as Id<"stores">[],
     }
 
     return { success: true, report }
@@ -146,17 +150,16 @@ export async function generateReport(
 // Function to get all reports from Appwrite
 export async function getAllReports() {
   try {
-    const databases = getDatabases()
-    const response = await databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_REPORTS_ID)
-    
-    const reports: Report[] = response.documents.map((doc) => ({
-      id: doc.$id,
+    const orgId = await resolveOrgId()
+    const response = await fetchAuthQuery(api.reports.listReports, { orgId })
+    const reports: Report[] = response.map((doc: (typeof response)[number]) => ({
+      id: doc._id,
       name: doc.name,
-      createdAt: doc.createdAt,
+      createdAt: new Date(doc.createdAt).toISOString(),
       url: doc.url,
-      storeIds: doc.storeIds || [],
+      storeIds: doc.storeIds,
     }))
-    
+
     return { success: true, reports }
   } catch (error) {
     console.error("Error fetching reports:", error)

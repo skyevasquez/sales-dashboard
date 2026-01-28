@@ -1,11 +1,16 @@
 import { Client, Databases, Account } from "appwrite"
 
-export const client = new Client()
-  .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || "")
-  .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || "")
+const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT
+const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID
 
-export const databases = new Databases(client)
-export const account = new Account(client)
+export const appwriteConfigured = Boolean(endpoint && projectId)
+
+export const client = appwriteConfigured
+  ? new Client().setEndpoint(endpoint!).setProject(projectId!)
+  : null
+
+export const databases = client ? new Databases(client) : null
+export const account = client ? new Account(client) : null
 
 export const APPWRITE_DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || ""
 export const APPWRITE_COLLECTION_STORES_ID = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_STORES_ID || ""

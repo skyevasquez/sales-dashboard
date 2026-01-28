@@ -1,26 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth } from "@/context/AuthContext";
+import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle, Mail } from "lucide-react";
 
 interface RegisterFormProps {
   onToggleMode?: () => void;
 }
 
 export function RegisterForm({ onToggleMode }: RegisterFormProps) {
-  const { register } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [verificationSent, setVerificationSent] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,12 +40,55 @@ export function RegisterForm({ onToggleMode }: RegisterFormProps) {
     setLoading(true);
 
     try {
-      await register(email, password, name);
+      const response = await authClient.signUp.email({
+        name,
+        email,
+        password,
+      });
+      if (response.error) {
+        throw new Error(response.error.message || "Failed to register.");
+      }
+      // Show verification message
+      setVerificationSent(true);
     } catch (err: any) {
       setError(err.message || "Failed to register. Please try again.");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (verificationSent) {
+    return (
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-green-500" />
+            Check Your Email
+          </CardTitle>
+          <CardDescription>
+            We've sent you a verification email. Please check your inbox to complete your registration.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-center py-4">
+            <div className="bg-primary/10 p-4 rounded-full">
+              <Mail className="h-8 w-8 text-primary" />
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground text-center">
+            Click the link in the email we sent to <strong>{email}</strong> to verify your account.
+          </p>
+          <p className="text-sm text-muted-foreground text-center">
+            Didn't receive it? Check your spam folder or try signing in again to resend.
+          </p>
+        </CardContent>
+        <CardFooter>
+          <Button onClick={onToggleMode} variant="outline" className="w-full">
+            Back to Sign In
+          </Button>
+        </CardFooter>
+      </Card>
+    );
   }
 
   return (
@@ -64,30 +108,35 @@ export function RegisterForm({ onToggleMode }: RegisterFormProps) {
             <Label htmlFor="name">Full Name</Label>
             <Input
               id="name"
+              name="name"
               type="text"
               placeholder="John Doe"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
               disabled={loading}
+              autoComplete="name"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
+              name="email"
               type="email"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={loading}
+              autoComplete="email"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
             <Input
               id="password"
+              name="password"
               type="password"
               placeholder="••••••••"
               value={password}
@@ -95,12 +144,15 @@ export function RegisterForm({ onToggleMode }: RegisterFormProps) {
               required
               disabled={loading}
               minLength={8}
+              autoComplete="new-password"
+              spellCheck={false}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirm Password</Label>
             <Input
               id="confirmPassword"
+              name="confirmPassword"
               type="password"
               placeholder="••••••••"
               value={confirmPassword}
@@ -108,6 +160,8 @@ export function RegisterForm({ onToggleMode }: RegisterFormProps) {
               required
               disabled={loading}
               minLength={8}
+              autoComplete="new-password"
+              spellCheck={false}
             />
           </div>
         </CardContent>
@@ -116,7 +170,7 @@ export function RegisterForm({ onToggleMode }: RegisterFormProps) {
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating account...
+                Creating account…
               </>
             ) : (
               "Sign Up"

@@ -105,7 +105,7 @@ export function ImportCsvDialog({ open, onOpenChange, stores, kpis, onImport }: 
 
           <TabsContent value="upload" className="space-y-4 py-4">
             <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-md p-6 space-y-2">
-              <Upload className="h-8 w-8 text-muted-foreground" />
+              <Upload className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
               <p className="text-sm text-muted-foreground">Upload a CSV file</p>
               <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
               <Button onClick={() => fileInputRef.current?.click()}>Select File</Button>
@@ -116,7 +116,7 @@ export function ImportCsvDialog({ open, onOpenChange, stores, kpis, onImport }: 
                 <div className="max-h-[200px] overflow-auto border rounded-md p-2">
                   <pre className="text-xs">
                     {csvContent.slice(0, 1000)}
-                    {csvContent.length > 1000 ? "..." : ""}
+                    {csvContent.length > 1000 ? "…" : ""}
                   </pre>
                 </div>
               </div>
@@ -146,7 +146,7 @@ export function ImportCsvDialog({ open, onOpenChange, stores, kpis, onImport }: 
             <Download className="h-4 w-4 mr-2" /> Download Template
           </Button>
           <Button onClick={handleParse} disabled={!csvContent.trim() || isProcessing}>
-            {isProcessing ? "Processing..." : "Validate Data"}
+            {isProcessing ? "Processing…" : "Validate Data"}
           </Button>
         </div>
 

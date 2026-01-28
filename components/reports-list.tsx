@@ -4,19 +4,21 @@ import { Button } from "@/components/ui/button"
 import { Download, FileText, Trash2, FileDown } from "lucide-react"
 import type { Report } from "@/app/actions/report-actions"
 import type { Store } from "./sales-dashboard"
+import type { Id } from "@/convex/_generated/dataModel"
 
 interface ReportsListProps {
   reports: Report[]
   stores: Store[]
-  onDeleteReport: (reportId: string) => void
+  onDeleteReport: (reportId: Id<"reports">) => void
   onExportCsv?: () => void
+  canDelete?: boolean
 }
 
-export function ReportsList({ reports, stores, onDeleteReport, onExportCsv }: ReportsListProps) {
+export function ReportsList({ reports, stores, onDeleteReport, onExportCsv, canDelete = true }: ReportsListProps) {
   // Sort reports by creation date (newest first)
   const sortedReports = [...reports].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
-  const getStoreNames = (storeIds: string[]) => {
+  const getStoreNames = (storeIds: Id<"stores">[]) => {
     if (storeIds.length === 0) return "All Stores"
 
     return storeIds.map((id) => stores.find((store) => store.id === id)?.name || "Unknown Store").join(", ")
@@ -61,10 +63,12 @@ export function ReportsList({ reports, stores, onDeleteReport, onExportCsv }: Re
                     <span className="sr-only">Download</span>
                   </a>
                 </Button>
-                <Button variant="outline" size="icon" onClick={() => onDeleteReport(report.id)}>
-                  <Trash2 className="h-4 w-4" />
-                  <span className="sr-only">Delete</span>
-                </Button>
+                {canDelete && (
+                  <Button variant="outline" size="icon" onClick={() => onDeleteReport(report.id)} aria-label="Delete report">
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Delete</span>
+                  </Button>
+                )}
               </div>
             </div>
             <CardDescription>Generated on {formatDate(report.createdAt)}</CardDescription>

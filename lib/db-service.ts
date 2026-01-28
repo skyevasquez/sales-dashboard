@@ -3,6 +3,7 @@
 import { ID, Query } from "appwrite"
 import {
   databases,
+  appwriteConfigured,
   APPWRITE_DATABASE_ID,
   APPWRITE_COLLECTION_STORES_ID,
   APPWRITE_COLLECTION_KPIS_ID,
@@ -13,8 +14,16 @@ import {
 import type { Store, Kpi, SalesData } from "@/components/sales-dashboard"
 import type { Report } from "@/app/actions/report-actions"
 
+function warnAppwriteDisabled(feature: string) {
+  console.warn(`Appwrite is not configured. ${feature} is disabled.`)
+}
+
 // Stores
 export async function getStores(): Promise<Store[]> {
+  if (!appwriteConfigured || !databases || !APPWRITE_DATABASE_ID || !APPWRITE_COLLECTION_STORES_ID) {
+    warnAppwriteDisabled("Fetching stores")
+    return []
+  }
   try {
     const response = await databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_STORES_ID, [
       Query.orderDesc("$createdAt"),
@@ -30,6 +39,9 @@ export async function getStores(): Promise<Store[]> {
 }
 
 export async function createStore(name: string): Promise<Store> {
+  if (!appwriteConfigured || !databases || !APPWRITE_DATABASE_ID || !APPWRITE_COLLECTION_STORES_ID) {
+    throw new Error("Appwrite is not configured. Store creation is disabled.")
+  }
   const response = await databases.createDocument(
     APPWRITE_DATABASE_ID,
     APPWRITE_COLLECTION_STORES_ID,
@@ -43,11 +55,19 @@ export async function createStore(name: string): Promise<Store> {
 }
 
 export async function deleteStore(id: string): Promise<void> {
+  if (!appwriteConfigured || !databases || !APPWRITE_DATABASE_ID || !APPWRITE_COLLECTION_STORES_ID) {
+    warnAppwriteDisabled("Deleting stores")
+    return
+  }
   await databases.deleteDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_STORES_ID, id)
 }
 
 // KPIs
 export async function getKpis(): Promise<Kpi[]> {
+  if (!appwriteConfigured || !databases || !APPWRITE_DATABASE_ID || !APPWRITE_COLLECTION_KPIS_ID) {
+    warnAppwriteDisabled("Fetching KPIs")
+    return []
+  }
   try {
     const response = await databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_KPIS_ID, [
       Query.orderDesc("$createdAt"),
@@ -63,6 +83,9 @@ export async function getKpis(): Promise<Kpi[]> {
 }
 
 export async function createKpi(name: string): Promise<Kpi> {
+  if (!appwriteConfigured || !databases || !APPWRITE_DATABASE_ID || !APPWRITE_COLLECTION_KPIS_ID) {
+    throw new Error("Appwrite is not configured. KPI creation is disabled.")
+  }
   const response = await databases.createDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_KPIS_ID, ID.unique(), {
     name,
   })
@@ -73,11 +96,19 @@ export async function createKpi(name: string): Promise<Kpi> {
 }
 
 export async function deleteKpi(id: string): Promise<void> {
+  if (!appwriteConfigured || !databases || !APPWRITE_DATABASE_ID || !APPWRITE_COLLECTION_KPIS_ID) {
+    warnAppwriteDisabled("Deleting KPIs")
+    return
+  }
   await databases.deleteDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_KPIS_ID, id)
 }
 
 // Sales Data
 export async function getSalesData(): Promise<SalesData[]> {
+  if (!appwriteConfigured || !databases || !APPWRITE_DATABASE_ID || !APPWRITE_COLLECTION_SALES_ID) {
+    warnAppwriteDisabled("Fetching sales data")
+    return []
+  }
   try {
     const response = await databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_SALES_ID, [
       Query.limit(10000), // Increase limit to get all records
@@ -95,6 +126,9 @@ export async function getSalesData(): Promise<SalesData[]> {
 }
 
 export async function upsertSalesData(data: SalesData): Promise<void> {
+  if (!appwriteConfigured || !databases || !APPWRITE_DATABASE_ID || !APPWRITE_COLLECTION_SALES_ID) {
+    throw new Error("Appwrite is not configured. Sales updates are disabled.")
+  }
   try {
     // Try to find existing document
     const response = await databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_SALES_ID, [
@@ -124,12 +158,17 @@ export async function upsertSalesData(data: SalesData): Promise<void> {
 }
 
 export async function deleteSalesDataByStore(storeId: string): Promise<void> {
+  if (!appwriteConfigured || !databases || !APPWRITE_DATABASE_ID || !APPWRITE_COLLECTION_SALES_ID) {
+    warnAppwriteDisabled("Deleting sales data by store")
+    return
+  }
+  const db = databases
   try {
-    const response = await databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_SALES_ID, [
+    const response = await db.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_SALES_ID, [
       Query.equal("storeId", storeId),
     ])
     await Promise.all(
-      response.documents.map((doc) => databases.deleteDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_SALES_ID, doc.$id)),
+      response.documents.map((doc) => db.deleteDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_SALES_ID, doc.$id)),
     )
   } catch (error) {
     console.error("Error deleting sales data by store:", error)
@@ -137,12 +176,17 @@ export async function deleteSalesDataByStore(storeId: string): Promise<void> {
 }
 
 export async function deleteSalesDataByKpi(kpiId: string): Promise<void> {
+  if (!appwriteConfigured || !databases || !APPWRITE_DATABASE_ID || !APPWRITE_COLLECTION_SALES_ID) {
+    warnAppwriteDisabled("Deleting sales data by KPI")
+    return
+  }
+  const db = databases
   try {
-    const response = await databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_SALES_ID, [
+    const response = await db.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_SALES_ID, [
       Query.equal("kpiId", kpiId),
     ])
     await Promise.all(
-      response.documents.map((doc) => databases.deleteDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_SALES_ID, doc.$id)),
+      response.documents.map((doc) => db.deleteDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_SALES_ID, doc.$id)),
     )
   } catch (error) {
     console.error("Error deleting sales data by KPI:", error)
@@ -151,6 +195,10 @@ export async function deleteSalesDataByKpi(kpiId: string): Promise<void> {
 
 // Reports
 export async function getReports(): Promise<Report[]> {
+  if (!appwriteConfigured || !databases || !APPWRITE_DATABASE_ID || !APPWRITE_COLLECTION_REPORTS_ID) {
+    warnAppwriteDisabled("Fetching reports")
+    return []
+  }
   try {
     const response = await databases.listDocuments(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_REPORTS_ID, [
       Query.orderDesc("$createdAt"),
@@ -169,6 +217,9 @@ export async function getReports(): Promise<Report[]> {
 }
 
 export async function createReport(report: Omit<Report, "id">): Promise<Report> {
+  if (!appwriteConfigured || !databases || !APPWRITE_DATABASE_ID || !APPWRITE_COLLECTION_REPORTS_ID) {
+    throw new Error("Appwrite is not configured. Report creation is disabled.")
+  }
   const response = await databases.createDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_REPORTS_ID, ID.unique(), {
     name: report.name,
     createdAt: report.createdAt,
@@ -185,11 +236,19 @@ export async function createReport(report: Omit<Report, "id">): Promise<Report> 
 }
 
 export async function deleteReport(id: string): Promise<void> {
+  if (!appwriteConfigured || !databases || !APPWRITE_DATABASE_ID || !APPWRITE_COLLECTION_REPORTS_ID) {
+    warnAppwriteDisabled("Deleting reports")
+    return
+  }
   await databases.deleteDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_REPORTS_ID, id)
 }
 
 // Historical Snapshots
 export async function createSnapshot(salesData: SalesData[]): Promise<void> {
+  if (!appwriteConfigured || !databases || !APPWRITE_DATABASE_ID || !APPWRITE_COLLECTION_SNAPSHOTS_ID) {
+    warnAppwriteDisabled("Creating snapshots")
+    return
+  }
   try {
     await databases.createDocument(APPWRITE_DATABASE_ID, APPWRITE_COLLECTION_SNAPSHOTS_ID, ID.unique(), {
       timestamp: new Date().toISOString(),

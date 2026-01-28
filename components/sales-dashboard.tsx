@@ -1,11 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Trash2, FileText, FileDown, Upload, BarChart, LineChart, LayoutDashboard, Loader2 } from "lucide-react"
+import { Plus, Trash2, FileText, FileDown, Upload, BarChart, LineChart, LayoutDashboard, Loader2, Building2 } from "lucide-react"
 import { AddStoreDialog } from "./add-store-dialog"
 import { AddKpiDialog } from "./add-kpi-dialog"
 import { GenerateReportDialog } from "./generate-report-dialog"
@@ -18,34 +18,35 @@ import { CustomizableDashboard } from "./customizable-dashboard"
 import { getDashboardPreferences } from "@/utils/dashboard-preferences"
 import type { Report } from "@/app/actions/report-actions"
 import type { CsvImportResult } from "@/utils/csv-import"
-import * as db from "@/lib/db-service"
 import { toast } from "sonner"
+import { useMutation, useQuery } from "convex/react"
+import { api } from "@/convex/_generated/api"
+import type { Id } from "@/convex/_generated/dataModel"
+import { authClient } from "@/lib/auth-client"
+import { useOrganization } from "./organization/organization-context"
 
 // Types
 export interface Store {
-  id: string
+  id: Id<"stores">
   name: string
 }
 
 export interface Kpi {
-  id: string
+  id: Id<"kpis">
   name: string
 }
 
 export interface SalesData {
-  storeId: string
-  kpiId: string
+  storeId: Id<"stores">
+  kpiId: Id<"kpis">
   monthlyGoal: number
   mtdSales: number
 }
 
 export function SalesDashboard() {
   // State
-  const [stores, setStores] = useState<Store[]>([])
-  const [kpis, setKpis] = useState<Kpi[]>([])
   const [salesData, setSalesData] = useState<SalesData[]>([])
   const [reports, setReports] = useState<Report[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [isStoreDialogOpen, setIsStoreDialogOpen] = useState(false)
   const [isKpiDialogOpen, setIsKpiDialogOpen] = useState(false)
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
@@ -57,66 +58,114 @@ export function SalesDashboard() {
   const [daysRemaining, setDaysRemaining] = useState(0)
   const [activeTab, setActiveTab] = useState(getDashboardPreferences().defaultTab)
 
-  // Load data from Appwrite on component mount
+  const { data: session, isPending } = authClient.useSession()
+  const isAuthenticated = Boolean(session)
+
+  // Use organization context
+  const { selectedOrgId, organizations, isLoading: orgLoading, canDelete } = useOrganization()
+
+  const createStoreMutation = useMutation(api.stores.createStore)
+  const deleteStoreMutation = useMutation(api.stores.deleteStore)
+  const createKpiMutation = useMutation(api.kpis.createKpi)
+  const deleteKpiMutation = useMutation(api.kpis.deleteKpi)
+  const upsertDailySales = useMutation(api.dailySales.upsertFromMtd)
+  const deleteReportMutation = useMutation(api.reports.deleteReport)
+
+  const orgId = selectedOrgId
+  const storeDocs = useQuery(api.stores.listStores, orgId ? { orgId } : "skip") ?? []
+  const kpiDocs = useQuery(api.kpis.listKpis, orgId ? { orgId } : "skip") ?? []
+
+  const stores = useMemo<Store[]>(
+    () => storeDocs.map((store) => ({ id: store._id, name: store.name })),
+    [storeDocs],
+  )
+
+  const kpis = useMemo<Kpi[]>(
+    () => kpiDocs.map((kpi) => ({ id: kpi._id, name: kpi.name })),
+    [kpiDocs],
+  )
+
+  const monthKey = useMemo(() => {
+    const year = currentDate.getFullYear()
+    const month = String(currentDate.getMonth() + 1).padStart(2, "0")
+    return `${year}-${month}`
+  }, [currentDate])
+
+  const dateKey = useMemo(() => {
+    const year = currentDate.getFullYear()
+    const month = String(currentDate.getMonth() + 1).padStart(2, "0")
+    const day = String(currentDate.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  }, [currentDate])
+
+  const salesSummary = useQuery(
+    api.dailySales.getSalesSummary,
+    orgId ? { orgId, monthKey } : "skip",
+  )
+
+  const reportDocs = useQuery(api.reports.listReports, orgId ? { orgId } : "skip")
+
+  const isLoading =
+    isPending ||
+    orgLoading ||
+    (orgId !== null && (storeDocs === undefined || kpiDocs === undefined))
+
   useEffect(() => {
-    async function loadData() {
-      setIsLoading(true)
-      try {
-        const [storesData, kpisData, salesDataData, reportsData] = await Promise.all([
-          db.getStores(),
-          db.getKpis(),
-          db.getSalesData(),
-          db.getReports(),
-        ])
+    const now = new Date()
+    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    setCurrentDate(now)
+    setDaysInMonth(lastDayOfMonth)
+    setDayOfMonth(now.getDate())
+    setDaysRemaining(lastDayOfMonth - now.getDate())
+  }, [])
 
-        setStores(storesData)
-        setKpis(kpisData)
-        setSalesData(salesDataData)
-        setReports(reportsData)
-
-        // Set date calculations
-        const now = new Date()
-        const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-        setCurrentDate(now)
-        setDaysInMonth(lastDayOfMonth)
-        setDayOfMonth(now.getDate())
-        setDaysRemaining(lastDayOfMonth - now.getDate())
-      } catch (error) {
-        console.error("Error loading data:", error)
-        toast.error("Failed to load data from database")
-      } finally {
-        setIsLoading(false)
-      }
+  useEffect(() => {
+    if (!salesSummary) {
+      return
     }
 
-    loadData()
-  }, [])
+    setSalesData(
+      salesSummary.map((entry: SalesData) => ({
+        storeId: entry.storeId,
+        kpiId: entry.kpiId,
+        monthlyGoal: entry.monthlyGoal,
+        mtdSales: entry.mtdSales,
+      })),
+    )
+  }, [salesSummary])
+
+  useEffect(() => {
+    if (!reportDocs) {
+      return
+    }
+
+    setReports(
+      reportDocs.map((report) => ({
+        id: report._id,
+        name: report.name,
+        createdAt: new Date(report.createdAt).toISOString(),
+        url: report.url,
+        storeIds: report.storeIds,
+      })),
+    )
+  }, [reportDocs])
 
 
   // Add a new store
   const addStore = async (storeName: string) => {
+    if (!orgId) {
+      toast.error("Organization not ready")
+      return
+    }
     try {
-      const newStore = await db.createStore(storeName)
-      setStores((prevStores) => [...prevStores, newStore])
+      const newStoreId = await createStoreMutation({ orgId, name: storeName })
 
       // Create default sales data entries for this store with all KPIs
-      const newSalesDataPromises = kpis.map((kpi) =>
-        db.upsertSalesData({
-          storeId: newStore.id,
-          kpiId: kpi.id,
-          monthlyGoal: 0,
-          mtdSales: 0,
-        }),
-      )
-
-      await Promise.all(newSalesDataPromises)
-
-      // Update local state
       setSalesData((prevSalesData) => {
         const newSalesData = [...prevSalesData]
         kpis.forEach((kpi) => {
           newSalesData.push({
-            storeId: newStore.id,
+            storeId: newStoreId,
             kpiId: kpi.id,
             monthlyGoal: 0,
             mtdSales: 0,
@@ -134,29 +183,20 @@ export function SalesDashboard() {
 
   // Add a new KPI
   const addKpi = async (kpiName: string) => {
+    if (!orgId) {
+      toast.error("Organization not ready")
+      return
+    }
     try {
-      const newKpi = await db.createKpi(kpiName)
-      setKpis((prevKpis) => [...prevKpis, newKpi])
+      const newKpiId = await createKpiMutation({ orgId, name: kpiName })
 
       // Create default sales data entries for this KPI with all stores
-      const newSalesDataPromises = stores.map((store) =>
-        db.upsertSalesData({
-          storeId: store.id,
-          kpiId: newKpi.id,
-          monthlyGoal: 0,
-          mtdSales: 0,
-        }),
-      )
-
-      await Promise.all(newSalesDataPromises)
-
-      // Update local state
       setSalesData((prevSalesData) => {
         const newSalesData = [...prevSalesData]
         stores.forEach((store) => {
           newSalesData.push({
             storeId: store.id,
-            kpiId: newKpi.id,
+            kpiId: newKpiId,
             monthlyGoal: 0,
             mtdSales: 0,
           })
@@ -172,11 +212,13 @@ export function SalesDashboard() {
   }
 
   // Remove a store
-  const removeStore = async (storeId: string) => {
+  const removeStore = async (storeId: Id<"stores">) => {
+    if (!orgId) {
+      toast.error("Organization not ready")
+      return
+    }
     try {
-      await db.deleteStore(storeId)
-      await db.deleteSalesDataByStore(storeId)
-      setStores((prevStores) => prevStores.filter((store) => store.id !== storeId))
+      await deleteStoreMutation({ orgId, storeId })
       setSalesData((prevSalesData) => prevSalesData.filter((data) => data.storeId !== storeId))
       toast.success("Store deleted successfully")
     } catch (error) {
@@ -186,11 +228,13 @@ export function SalesDashboard() {
   }
 
   // Remove a KPI
-  const removeKpi = async (kpiId: string) => {
+  const removeKpi = async (kpiId: Id<"kpis">) => {
+    if (!orgId) {
+      toast.error("Organization not ready")
+      return
+    }
     try {
-      await db.deleteKpi(kpiId)
-      await db.deleteSalesDataByKpi(kpiId)
-      setKpis((prevKpis) => prevKpis.filter((kpi) => kpi.id !== kpiId))
+      await deleteKpiMutation({ orgId, kpiId })
       setSalesData((prevSalesData) => prevSalesData.filter((data) => data.kpiId !== kpiId))
       toast.success("KPI deleted successfully")
     } catch (error) {
@@ -200,48 +244,57 @@ export function SalesDashboard() {
   }
 
   // Update sales data
-  const updateSalesData = async (storeId: string, kpiId: string, field: "monthlyGoal" | "mtdSales", value: number) => {
-    let updatedEntry: SalesData | null = null
-    let updatedDataset: SalesData[] = []
+  const updateSalesData = async (
+    storeId: Id<"stores">,
+    kpiId: Id<"kpis">,
+    field: "monthlyGoal" | "mtdSales",
+    value: number,
+  ) => {
+    const dataIndex = salesData.findIndex((data) => data.storeId === storeId && data.kpiId === kpiId)
 
-    setSalesData((prev) => {
-      const dataIndex = prev.findIndex((data) => data.storeId === storeId && data.kpiId === kpiId)
+    let updatedEntry: SalesData
+    let updatedDataset: SalesData[]
 
-      if (dataIndex >= 0) {
-        const nextEntry = { ...prev[dataIndex], [field]: value }
-        const nextData = [...prev]
-        nextData[dataIndex] = nextEntry
-        updatedEntry = nextEntry
-        updatedDataset = nextData
-        return nextData
-      }
-
-      const nextEntry: SalesData = {
+    if (dataIndex >= 0) {
+      updatedEntry = { ...salesData[dataIndex], [field]: value }
+      updatedDataset = [...salesData]
+      updatedDataset[dataIndex] = updatedEntry
+    } else {
+      updatedEntry = {
         storeId,
         kpiId,
         monthlyGoal: field === "monthlyGoal" ? value : 0,
         mtdSales: field === "mtdSales" ? value : 0,
       }
-      updatedEntry = nextEntry
-      updatedDataset = [...prev, nextEntry]
-      return updatedDataset
-    })
+      updatedDataset = [...salesData, updatedEntry]
+    }
 
-    if (!updatedEntry) {
+    setSalesData(updatedDataset)
+
+    if (!orgId) {
+      toast.error("Organization not ready")
       return
     }
 
     try {
-      await db.upsertSalesData(updatedEntry)
-      await db.createSnapshot(updatedDataset)
+      await upsertDailySales({
+        orgId,
+        storeId,
+        kpiId,
+        dateKey,
+        monthKey,
+        mtdSales: updatedEntry.mtdSales,
+        monthlyGoal: updatedEntry.monthlyGoal,
+      })
     } catch (error) {
       console.error("Error updating sales data:", error)
       toast.error("Failed to update sales data")
+      setSalesData(updatedDataset)
     }
   }
 
   // Get sales data for a specific store and KPI
-  const getSalesData = (storeId: string, kpiId: string) => {
+  const getSalesData = (storeId: Id<"stores">, kpiId: Id<"kpis">) => {
     return (
       salesData.find((data) => data.storeId === storeId && data.kpiId === kpiId) || {
         storeId,
@@ -274,9 +327,13 @@ export function SalesDashboard() {
   }
 
   // Delete a report
-  const deleteReport = async (reportId: string) => {
+  const deleteReport = async (reportId: Report["id"]) => {
     try {
-      await db.deleteReport(reportId)
+      if (!orgId) {
+        toast.error("Organization not ready")
+        return
+      }
+      await deleteReportMutation({ orgId, reportId })
       setReports((prev) => prev.filter((report) => report.id !== reportId))
       toast.success("Report deleted successfully")
     } catch (error) {
@@ -297,17 +354,13 @@ export function SalesDashboard() {
         if (!trimmedName) continue
         const key = trimmedName.toLowerCase()
         if (storeNameMap.has(key)) continue
-        const newStore = await db.createStore(trimmedName)
+        if (!orgId) {
+          throw new Error("Organization not ready")
+        }
+        const newStoreId = await createStoreMutation({ orgId, name: trimmedName })
+        const newStore = { id: newStoreId, name: trimmedName }
         createdStores.push(newStore)
         storeNameMap.set(key, newStore)
-      }
-
-      if (createdStores.length > 0) {
-        setStores((prev) => {
-          const existingIds = new Set(prev.map((store) => store.id))
-          const additions = createdStores.filter((store) => !existingIds.has(store.id))
-          return additions.length > 0 ? [...prev, ...additions] : prev
-        })
       }
 
       const createdKpis: Kpi[] = []
@@ -316,17 +369,13 @@ export function SalesDashboard() {
         if (!trimmedName) continue
         const key = trimmedName.toLowerCase()
         if (kpiNameMap.has(key)) continue
-        const newKpi = await db.createKpi(trimmedName)
+        if (!orgId) {
+          throw new Error("Organization not ready")
+        }
+        const newKpiId = await createKpiMutation({ orgId, name: trimmedName })
+        const newKpi = { id: newKpiId, name: trimmedName }
         createdKpis.push(newKpi)
         kpiNameMap.set(key, newKpi)
-      }
-
-      if (createdKpis.length > 0) {
-        setKpis((prev) => {
-          const existingIds = new Set(prev.map((kpi) => kpi.id))
-          const additions = createdKpis.filter((kpi) => !existingIds.has(kpi.id))
-          return additions.length > 0 ? [...prev, ...additions] : prev
-        })
       }
 
       const salesUpdates: SalesData[] = []
@@ -355,7 +404,23 @@ export function SalesDashboard() {
         return
       }
 
-      await Promise.all(salesUpdates.map((entry) => db.upsertSalesData(entry)))
+      if (!orgId) {
+        throw new Error("Organization not ready")
+      }
+
+      await Promise.all(
+        salesUpdates.map((entry) =>
+          upsertDailySales({
+            orgId,
+            storeId: entry.storeId,
+            kpiId: entry.kpiId,
+            dateKey,
+            monthKey,
+            mtdSales: entry.mtdSales,
+            monthlyGoal: entry.monthlyGoal,
+          }),
+        ),
+      )
 
       let mergedData: SalesData[] = []
       setSalesData((prev) => {
@@ -363,10 +428,7 @@ export function SalesDashboard() {
         return mergedData
       })
 
-      if (mergedData.length > 0) {
-        await db.createSnapshot(mergedData)
-      }
-
+      void mergedData
       toast.success(result.message || "Data imported successfully")
     } catch (error) {
       console.error("Error importing data:", error)
@@ -379,7 +441,23 @@ export function SalesDashboard() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading dashboard data...</p>
+          <p className="text-muted-foreground">Loading dashboard data…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!orgId) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-4">
+          <Building2 className="h-12 w-12 mx-auto text-muted-foreground" />
+          <div>
+            <p className="text-lg font-medium">No Organization Selected</p>
+            <p className="text-muted-foreground">
+              Create or select an organization to get started
+            </p>
+          </div>
         </div>
       </div>
     )
@@ -389,7 +467,7 @@ export function SalesDashboard() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <p className="text-sm text-muted-foreground">Today: {currentDate.toLocaleDateString()}</p>
+          <p className="text-sm text-muted-foreground" suppressHydrationWarning>Today: {currentDate.toLocaleDateString()}</p>
           <p className="text-sm text-muted-foreground">
             Day {dayOfMonth} of {daysInMonth} ({daysRemaining} days remaining)
           </p>
@@ -466,9 +544,11 @@ export function SalesDashboard() {
                     <div key={store.id} className="space-y-4">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-medium">{store.name}</h3>
-                        <Button variant="ghost" size="icon" onClick={() => removeStore(store.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {canDelete && (
+                          <Button variant="ghost" size="icon" onClick={() => removeStore(store.id)} aria-label="Delete store">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {kpis.map((kpi) => {
@@ -477,19 +557,28 @@ export function SalesDashboard() {
                             <Card key={kpi.id} className="overflow-hidden">
                               <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
                                 <CardTitle className="text-base">{kpi.name}</CardTitle>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={() => removeKpi(kpi.id)}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
+                                {canDelete && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => removeKpi(kpi.id)}
+                                    aria-label="Delete KPI"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
                               </CardHeader>
                               <CardContent className="p-4 pt-2 space-y-2">
                                 <div>
-                                  <label className="text-sm font-medium">Monthly Goal</label>
+                                  <label
+                                    className="text-sm font-medium"
+                                    htmlFor={`monthly-goal-${store.id}-${kpi.id}`}
+                                  >
+                                    Monthly Goal
+                                  </label>
                                   <Input
+                                    id={`monthly-goal-${store.id}-${kpi.id}`}
                                     type="number"
                                     value={data.monthlyGoal || ""}
                                     onChange={(e) =>
@@ -503,8 +592,14 @@ export function SalesDashboard() {
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-sm font-medium">MTD Sales</label>
+                                  <label
+                                    className="text-sm font-medium"
+                                    htmlFor={`mtd-sales-${store.id}-${kpi.id}`}
+                                  >
+                                    MTD Sales
+                                  </label>
                                   <Input
+                                    id={`mtd-sales-${store.id}-${kpi.id}`}
                                     type="number"
                                     value={data.mtdSales || ""}
                                     onChange={(e) =>
@@ -536,6 +631,7 @@ export function SalesDashboard() {
             stores={stores}
             onDeleteReport={deleteReport}
             onExportCsv={() => setIsCsvExportDialogOpen(true)}
+            canDelete={canDelete}
           />
         </TabsContent>
       </Tabs>
