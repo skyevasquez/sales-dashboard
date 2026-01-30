@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, CheckCircle, XCircle, Mail } from "lucide-react";
 import Link from "next/link";
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [error, setError] = useState("");
   const [resendLoading, setResendLoading] = useState(false);
@@ -20,32 +20,32 @@ export default function VerifyEmailPage() {
   const email = searchParams.get("email") || "";
 
   useEffect(() => {
+    async function verifyEmail() {
+      try {
+        const response = await authClient.verifyEmail({
+          query: { token: token! },
+        });
+        if (response.error) {
+          throw new Error(response.error.message || "Failed to verify email.");
+        }
+        setStatus("success");
+        
+        setTimeout(() => {
+          router.push("/auth");
+        }, 3000);
+      } catch (err: any) {
+        setStatus("error");
+        setError(err.message || "Failed to verify email. The link may have expired.");
+      }
+    }
+
     if (token) {
       verifyEmail();
     } else {
       setStatus("error");
       setError("Invalid verification link. Please check your email for the correct link.");
     }
-  }, [token]);
-
-  async function verifyEmail() {
-    try {
-      const response = await authClient.verifyEmail({
-        query: { token: token! },
-      });
-      if (response.error) {
-        throw new Error(response.error.message || "Failed to verify email.");
-      }
-      setStatus("success");
-      // Redirect to login after 3 seconds
-      setTimeout(() => {
-        router.push("/auth");
-      }, 3000);
-    } catch (err: any) {
-      setStatus("error");
-      setError(err.message || "Failed to verify email. The link may have expired.");
-    }
-  }
+  }, [token, router]);
 
   async function resendVerification() {
     if (!email) {
@@ -57,15 +57,14 @@ export default function VerifyEmailPage() {
     setResendSuccess(false);
 
     try {
-      // Note: Better Auth doesn't expose a direct resend method, 
-      // so we need to sign in again to trigger verification email
-      // This is a simplified version - you may need to adjust based on your Better Auth version
+      // Trigger verification email via failed sign-in attempt
+      // Better Auth workaround: attempt sign-in to prompt verification
       await authClient.signIn.email({
         email,
-        password: "", // This will fail but may trigger verification email
+        password: "", 
       });
     } catch {
-      // Expected to fail without password, but verification email may be sent
+      // Expected failure; verification email mechanism relies on this trigger
     }
 
     setResendSuccess(true);
@@ -147,5 +146,26 @@ export default function VerifyEmailPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense 
+      fallback={
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Loading...
+              </CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+      }
+    >
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

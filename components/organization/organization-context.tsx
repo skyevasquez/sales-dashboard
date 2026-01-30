@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { toast } from "sonner"
+import { authClient } from "@/lib/auth-client"
 
 interface Organization {
   _id: Id<"organizations">
@@ -33,11 +34,18 @@ const STORAGE_KEY = "selected-org-id"
 
 export function OrganizationProvider({ children }: { children: ReactNode }) {
   const [selectedOrgId, setSelectedOrgId] = useState<Id<"organizations"> | null>(null)
+  const { data: session, isPending } = authClient.useSession()
+  const isAuthenticated = !!session?.user
   
-  const organizations = useQuery(api.organizations.listOrganizations) ?? []
+  const organizationsResult = useQuery(
+    api.organizations.listOrganizations,
+    isAuthenticated ? undefined : "skip"
+  )
+  const organizations = organizationsResult ?? []
+  
   const myRole = useQuery(
     api.orgMembers.getMyOrgRole,
-    selectedOrgId ? { orgId: selectedOrgId } : "skip"
+    isAuthenticated && selectedOrgId ? { orgId: selectedOrgId } : "skip"
   )
   const createOrganization = useMutation(api.organizations.createOrganization)
 
@@ -90,7 +98,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     selectedOrg,
     selectedOrgId,
     myRole: myRole as "owner" | "admin" | "member" | null,
-    isLoading: organizations === undefined,
+    isLoading: isPending || (isAuthenticated && organizationsResult === undefined),
     selectOrg,
     createOrg,
     refetchOrgs: () => {}, // Convex handles this automatically

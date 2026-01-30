@@ -2,7 +2,9 @@ import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/react'
+import { AuthKitProvider } from '@workos-inc/authkit-nextjs/client'
 import { ConvexClientProvider } from '@/components/convex-client-provider'
+import { getToken } from '@/lib/auth-server'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -14,11 +16,13 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const token = await getToken()
+  
   return (
     <html lang="en" className="dark" style={{ colorScheme: 'dark' }}>
       <head>
@@ -31,7 +35,9 @@ html {
         `}</style>
       </head>
       <body>
-        <ConvexClientProvider>{children}</ConvexClientProvider>
+        <AuthKitProvider>
+          <ConvexClientProvider initialToken={token}>{children}</ConvexClientProvider>
+        </AuthKitProvider>
         <Analytics />
       </body>
     </html>

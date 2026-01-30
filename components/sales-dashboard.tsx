@@ -22,8 +22,8 @@ import { toast } from "sonner"
 import { useMutation, useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
-import { authClient } from "@/lib/auth-client"
 import { useOrganization } from "./organization/organization-context"
+import { authClient } from "@/lib/auth-client"
 
 // Types
 export interface Store {
@@ -58,8 +58,8 @@ export function SalesDashboard() {
   const [daysRemaining, setDaysRemaining] = useState(0)
   const [activeTab, setActiveTab] = useState(getDashboardPreferences().defaultTab)
 
-  const { data: session, isPending } = authClient.useSession()
-  const isAuthenticated = Boolean(session)
+  const { data: session, isPending: authLoading } = authClient.useSession()
+  const isAuthenticated = !!session?.user
 
   // Use organization context
   const { selectedOrgId, organizations, isLoading: orgLoading, canDelete } = useOrganization()
@@ -106,7 +106,7 @@ export function SalesDashboard() {
   const reportDocs = useQuery(api.reports.listReports, orgId ? { orgId } : "skip")
 
   const isLoading =
-    isPending ||
+    authLoading ||
     orgLoading ||
     (orgId !== null && (storeDocs === undefined || kpiDocs === undefined))
 

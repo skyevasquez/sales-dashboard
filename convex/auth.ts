@@ -4,7 +4,6 @@ import { query, action } from "./_generated/server";
 import { DataModel } from "./_generated/dataModel";
 import { components } from "./_generated/api";
 import { betterAuth } from "better-auth/minimal";
-import { Resend } from "resend";
 import authConfig from "./auth.config";
 import { v } from "convex/values";
 
@@ -14,8 +13,39 @@ const fromEmail = process.env.FROM_EMAIL ?? "noreply@yourdomain.com";
 
 export const authComponent = createClient<DataModel>(components.betterAuth);
 
-// Initialize Resend if API key is available
-const resend = resendApiKey ? new Resend(resendApiKey) : null;
+async function sendResendEmail({
+  to,
+  subject,
+  html,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+}) {
+  if (!resendApiKey) {
+    console.error("Resend not configured. Email would have been sent to:", to);
+    return;
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: fromEmail,
+      to,
+      subject,
+      html,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    console.error("Failed to send email via Resend:", response.status, body);
+  }
+}
 
 export const createAuth = (ctx: GenericCtx<DataModel>) => {
   return betterAuth({
@@ -25,12 +55,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
       enabled: true,
       requireEmailVerification: true,
       sendResetPassword: async ({ user, url, token }) => {
-        if (!resend) {
-          console.error("Resend not configured. Email would have been sent to:", user.email);
-          return;
-        }
-        await resend.emails.send({
-          from: fromEmail,
+        await sendResendEmail({
           to: user.email,
           subject: "Reset your password",
           html: `
@@ -44,12 +69,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
     },
     emailVerification: {
       sendVerificationEmail: async ({ user, url, token }) => {
-        if (!resend) {
-          console.error("Resend not configured. Email would have been sent to:", user.email);
-          return;
-        }
-        await resend.emails.send({
-          from: fromEmail,
+        await sendResendEmail({
           to: user.email,
           subject: "Verify your email",
           html: `
@@ -76,7 +96,7 @@ export const getCurrentUser = query({
 export const sendVerificationEmail = action({
   args: { email: v.string() },
   handler: async (ctx, args) => {
-    if (!resend) {
+    if (!resendApiKey) {
       throw new Error("Email service not configured");
     }
     // This will be handled by Better Auth
