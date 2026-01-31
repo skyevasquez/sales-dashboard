@@ -2,12 +2,20 @@ import { handleAuth } from '@workos-inc/authkit-nextjs';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@/convex/_generated/api';
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+function getConvexClient() {
+  const url = process.env.NEXT_PUBLIC_CONVEX_URL;
+  if (!url) {
+    throw new Error('NEXT_PUBLIC_CONVEX_URL is not set');
+  }
+  return new ConvexHttpClient(url);
+}
 
 export const GET = handleAuth({
   returnPathname: '/',
   onSuccess: async ({ user }) => {
     try {
+      const convex = getConvexClient();
+      
       await convex.mutation(api.users.upsertUser, {
         workosUserId: user.id,
         email: user.email,

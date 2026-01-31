@@ -7,7 +7,13 @@ import { ConvexHttpClient } from "convex/browser"
 import { api } from "@/convex/_generated/api"
 import { withAuth } from "@workos-inc/authkit-nextjs"
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
+function getConvexClient() {
+  const url = process.env.NEXT_PUBLIC_CONVEX_URL
+  if (!url) {
+    throw new Error("NEXT_PUBLIC_CONVEX_URL is not set")
+  }
+  return new ConvexHttpClient(url)
+}
 
 // Type for our report metadata
 export interface Report {
@@ -24,7 +30,7 @@ async function getOrgIdForUser(): Promise<string> {
     throw new Error("Unauthorized")
   }
   
-  // Get user's organizations from Convex
+  const convex = getConvexClient()
   const organizations = await convex.query(api.organizations.listOrganizations, {})
   if (!organizations || organizations.length === 0) {
     throw new Error("No organization found")
@@ -133,6 +139,7 @@ export async function generateReport(
 
     const orgId = await getOrgIdForUser()
     const createdAt = new Date().toISOString()
+    const convex = getConvexClient()
     const reportId = await convex.mutation(api.reports.createReport, {
       orgId,
       name: reportName,
@@ -164,6 +171,7 @@ export async function getAllReports() {
     }
 
     const orgId = await getOrgIdForUser()
+    const convex = getConvexClient()
     const response = await convex.query(api.reports.listReports, { orgId })
     const reports: Report[] = response.map((doc: (typeof response)[number]) => ({
       id: doc._id,
