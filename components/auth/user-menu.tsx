@@ -1,6 +1,6 @@
 "use client";
 
-import { authClient } from "@/lib/auth-client";
+import { useAuth } from '@workos-inc/authkit-nextjs/components';
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -18,25 +18,24 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export function UserMenu() {
-  const { data: session } = authClient.useSession();
-  const role = useQuery(api.appRoles.getMyRole);
+  const { user, signOut } = useAuth();
+  const workosUserId = user?.id;
+  const role = useQuery(api.appRoles.getMyRole, workosUserId ? { workosUserId } : "skip");
   const router = useRouter();
 
-  const user = session?.user;
   if (!user) return null;
 
-  const initials = user.name
-    ? user.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2)
-    : user.email[0].toUpperCase();
+  const initials = user.firstName && user.lastName
+    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+    : user.email?.[0]?.toUpperCase() || 'U';
+
+  const displayName = user.firstName && user.lastName
+    ? `${user.firstName} ${user.lastName}`
+    : user.email || 'User';
 
   async function handleLogout() {
     try {
-      await authClient.signOut();
+      await signOut();
       router.push("/auth");
     } catch (error) {
       console.error("Logout failed:", error);
@@ -55,11 +54,11 @@ export function UserMenu() {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.name || "User"}</p>
+            <p className="text-sm font-medium leading-none">{displayName}</p>
             <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
             {role && (
               <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80 pt-0.5">
-                {role.replace("_", " ")}
+                {role.replace('_', ' ')}
               </p>
             )}
           </div>

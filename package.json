@@ -9,7 +9,6 @@
     "start": "next start"
   },
   "dependencies": {
-    "@convex-dev/better-auth": "^0.10.10",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -41,9 +40,7 @@
     "@vercel/analytics": "1.3.1",
     "@vercel/blob": "latest",
     "@workos-inc/authkit-nextjs": "^2.13.0",
-    "appwrite": "^20.1.0",
     "autoprefixer": "^10.4.20",
-    "better-auth": "^1.4.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",

@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@workos-inc/authkit-nextjs/client';
+import { useAuth } from '@workos-inc/authkit-nextjs/components';
 import { Loader2 } from 'lucide-react';
 
 interface WorkOSProtectedRouteProps {

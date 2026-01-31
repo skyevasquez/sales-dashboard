@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { useOrganization } from "./organization-context"
+import { useAuth } from '@workos-inc/authkit-nextjs/components'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -33,7 +34,6 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Plus, Trash2, UserMinus, Crown, Shield, User } from "lucide-react"
-import { authClient } from "@/lib/auth-client"
 
 interface Member {
   memberId: string
@@ -46,13 +46,13 @@ interface Member {
 
 export function OrgMemberManager() {
   const { selectedOrgId, canInvite, canManageRoles, myRole } = useOrganization()
-  const { data: session } = authClient.useSession()
-  
+  const { user } = useAuth()
+
   const members = useQuery(
     api.orgMembers.listMembers,
     selectedOrgId ? { orgId: selectedOrgId } : "skip"
   ) ?? []
-  
+
   const inviteMember = useMutation(api.orgMembers.inviteMember)
   const updateMemberRole = useMutation(api.orgMembers.updateMemberRole)
   const removeMember = useMutation(api.orgMembers.removeMember)
@@ -65,7 +65,7 @@ export function OrgMemberManager() {
 
   const handleInvite = async () => {
     if (!selectedOrgId || !inviteEmail.trim()) return
-    
+
     setIsInviting(true)
     try {
       await inviteMember({
@@ -86,7 +86,7 @@ export function OrgMemberManager() {
 
   const handleRoleChange = async (memberId: string, newRole: "owner" | "admin" | "member") => {
     if (!selectedOrgId) return
-    
+
     try {
       await updateMemberRole({
         orgId: selectedOrgId,
@@ -102,7 +102,7 @@ export function OrgMemberManager() {
 
   const handleRemoveMember = async (memberId: string) => {
     if (!selectedOrgId) return
-    
+
     try {
       await removeMember({
         orgId: selectedOrgId,
@@ -117,7 +117,7 @@ export function OrgMemberManager() {
 
   const handleLeaveOrg = async () => {
     if (!selectedOrgId) return
-    
+
     try {
       await leaveOrganization({ orgId: selectedOrgId })
       toast.success("You have left the organization")
@@ -150,7 +150,7 @@ export function OrgMemberManager() {
     }
   }
 
-  const currentUserId = session?.user?.id
+  const currentUserId = user?.email || ""
   const myMemberId = members.find((m) => m.userId === currentUserId)?.memberId
 
   return (

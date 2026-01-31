@@ -21,24 +21,23 @@ import type { CsvImportResult } from "@/utils/csv-import"
 import { toast } from "sonner"
 import { useMutation, useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
-import type { Id } from "@/convex/_generated/dataModel"
 import { useOrganization } from "./organization/organization-context"
-import { authClient } from "@/lib/auth-client"
+import { useAuth } from '@workos-inc/authkit-nextjs/components'
 
 // Types
 export interface Store {
-  id: Id<"stores">
+  id: string
   name: string
 }
 
 export interface Kpi {
-  id: Id<"kpis">
+  id: string
   name: string
 }
 
 export interface SalesData {
-  storeId: Id<"stores">
-  kpiId: Id<"kpis">
+  storeId: string
+  kpiId: string
   monthlyGoal: number
   mtdSales: number
 }
@@ -48,6 +47,7 @@ export function SalesDashboard() {
   const [salesData, setSalesData] = useState<SalesData[]>([])
   const [reports, setReports] = useState<Report[]>([])
   const [isStoreDialogOpen, setIsStoreDialogOpen] = useState(false)
+  const { user } = useAuth()
   const [isKpiDialogOpen, setIsKpiDialogOpen] = useState(false)
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
   const [isCsvExportDialogOpen, setIsCsvExportDialogOpen] = useState(false)
@@ -58,8 +58,8 @@ export function SalesDashboard() {
   const [daysRemaining, setDaysRemaining] = useState(0)
   const [activeTab, setActiveTab] = useState(getDashboardPreferences().defaultTab)
 
-  const { data: session, isPending: authLoading } = authClient.useSession()
-  const isAuthenticated = !!session?.user
+  const isAuthenticated = !!user
+  const workosUserId = user?.id
 
   // Use organization context
   const { selectedOrgId, organizations, isLoading: orgLoading, canDelete } = useOrganization()
@@ -72,8 +72,8 @@ export function SalesDashboard() {
   const deleteReportMutation = useMutation(api.reports.deleteReport)
 
   const orgId = selectedOrgId
-  const storeDocs = useQuery(api.stores.listStores, orgId ? { orgId } : "skip") ?? []
-  const kpiDocs = useQuery(api.kpis.listKpis, orgId ? { orgId } : "skip") ?? []
+  const storeDocs = useQuery(api.stores.listStores, orgId && workosUserId ? { orgId: orgId as any, workosUserId } : "skip") ?? []
+  const kpiDocs = useQuery(api.kpis.listKpis, orgId && workosUserId ? { orgId: orgId as any, workosUserId } : "skip") ?? []
 
   const stores = useMemo<Store[]>(
     () => storeDocs.map((store) => ({ id: store._id, name: store.name })),
@@ -100,13 +100,12 @@ export function SalesDashboard() {
 
   const salesSummary = useQuery(
     api.dailySales.getSalesSummary,
-    orgId ? { orgId, monthKey } : "skip",
+    orgId && workosUserId ? { orgId: orgId as any, monthKey, workosUserId } : "skip",
   )
 
-  const reportDocs = useQuery(api.reports.listReports, orgId ? { orgId } : "skip")
+  const reportDocs = useQuery(api.reports.listReports, orgId && workosUserId ? { orgId: orgId as any, workosUserId } : "skip")
 
   const isLoading =
-    authLoading ||
     orgLoading ||
     (orgId !== null && (storeDocs === undefined || kpiDocs === undefined))
 
@@ -153,12 +152,12 @@ export function SalesDashboard() {
 
   // Add a new store
   const addStore = async (storeName: string) => {
-    if (!orgId) {
+    if (!orgId || !workosUserId) {
       toast.error("Organization not ready")
       return
     }
     try {
-      const newStoreId = await createStoreMutation({ orgId, name: storeName })
+      const newStoreId = await createStoreMutation({ orgId, name: storeName, workosUserId })
 
       // Create default sales data entries for this store with all KPIs
       setSalesData((prevSalesData) => {
@@ -183,12 +182,12 @@ export function SalesDashboard() {
 
   // Add a new KPI
   const addKpi = async (kpiName: string) => {
-    if (!orgId) {
+    if (!orgId || !workosUserId) {
       toast.error("Organization not ready")
       return
     }
     try {
-      const newKpiId = await createKpiMutation({ orgId, name: kpiName })
+      const newKpiId = await createKpiMutation({ orgId: orgId as any, name: kpiName, workosUserId })
 
       // Create default sales data entries for this KPI with all stores
       setSalesData((prevSalesData) => {
@@ -212,13 +211,13 @@ export function SalesDashboard() {
   }
 
   // Remove a store
-  const removeStore = async (storeId: Id<"stores">) => {
-    if (!orgId) {
+  const removeStore = async (storeId: string) => {
+    if (!orgId || !workosUserId) {
       toast.error("Organization not ready")
       return
     }
     try {
-      await deleteStoreMutation({ orgId, storeId })
+      await deleteStoreMutation({ orgId, storeId, workosUserId })
       setSalesData((prevSalesData) => prevSalesData.filter((data) => data.storeId !== storeId))
       toast.success("Store deleted successfully")
     } catch (error) {
@@ -228,13 +227,13 @@ export function SalesDashboard() {
   }
 
   // Remove a KPI
-  const removeKpi = async (kpiId: Id<"kpis">) => {
-    if (!orgId) {
+  const removeKpi = async (kpiId: string) => {
+    if (!orgId || !workosUserId) {
       toast.error("Organization not ready")
       return
     }
     try {
-      await deleteKpiMutation({ orgId, kpiId })
+      await deleteKpiMutation({ orgId: orgId as any, kpiId: kpiId as any, workosUserId })
       setSalesData((prevSalesData) => prevSalesData.filter((data) => data.kpiId !== kpiId))
       toast.success("KPI deleted successfully")
     } catch (error) {
@@ -245,8 +244,8 @@ export function SalesDashboard() {
 
   // Update sales data
   const updateSalesData = async (
-    storeId: Id<"stores">,
-    kpiId: Id<"kpis">,
+    storeId: string,
+    kpiId: string,
     field: "monthlyGoal" | "mtdSales",
     value: number,
   ) => {
@@ -271,7 +270,7 @@ export function SalesDashboard() {
 
     setSalesData(updatedDataset)
 
-    if (!orgId) {
+    if (!orgId || !workosUserId) {
       toast.error("Organization not ready")
       return
     }
@@ -285,6 +284,7 @@ export function SalesDashboard() {
         monthKey,
         mtdSales: updatedEntry.mtdSales,
         monthlyGoal: updatedEntry.monthlyGoal,
+        workosUserId,
       })
     } catch (error) {
       console.error("Error updating sales data:", error)
@@ -294,7 +294,7 @@ export function SalesDashboard() {
   }
 
   // Get sales data for a specific store and KPI
-  const getSalesData = (storeId: Id<"stores">, kpiId: Id<"kpis">) => {
+  const getSalesData = (storeId: string, kpiId: string) => {
     return (
       salesData.find((data) => data.storeId === storeId && data.kpiId === kpiId) || {
         storeId,
@@ -329,11 +329,11 @@ export function SalesDashboard() {
   // Delete a report
   const deleteReport = async (reportId: Report["id"]) => {
     try {
-      if (!orgId) {
+      if (!orgId || !workosUserId) {
         toast.error("Organization not ready")
         return
       }
-      await deleteReportMutation({ orgId, reportId })
+      await deleteReportMutation({ orgId: orgId as any, reportId: reportId as any, workosUserId })
       setReports((prev) => prev.filter((report) => report.id !== reportId))
       toast.success("Report deleted successfully")
     } catch (error) {
@@ -344,6 +344,10 @@ export function SalesDashboard() {
 
   // Handle CSV import
   const handleCsvImport = async (result: CsvImportResult) => {
+    if (!workosUserId) {
+      toast.error("Not authenticated")
+      return
+    }
     try {
       const storeNameMap = new Map(stores.map((store) => [store.name.trim().toLowerCase(), store]))
       const kpiNameMap = new Map(kpis.map((kpi) => [kpi.name.trim().toLowerCase(), kpi]))
@@ -357,7 +361,7 @@ export function SalesDashboard() {
         if (!orgId) {
           throw new Error("Organization not ready")
         }
-        const newStoreId = await createStoreMutation({ orgId, name: trimmedName })
+        const newStoreId = await createStoreMutation({ orgId, name: trimmedName, workosUserId })
         const newStore = { id: newStoreId, name: trimmedName }
         createdStores.push(newStore)
         storeNameMap.set(key, newStore)
@@ -372,7 +376,7 @@ export function SalesDashboard() {
         if (!orgId) {
           throw new Error("Organization not ready")
         }
-        const newKpiId = await createKpiMutation({ orgId, name: trimmedName })
+        const newKpiId = await createKpiMutation({ orgId: orgId as any, name: trimmedName, workosUserId })
         const newKpi = { id: newKpiId, name: trimmedName }
         createdKpis.push(newKpi)
         kpiNameMap.set(key, newKpi)
@@ -418,6 +422,7 @@ export function SalesDashboard() {
             monthKey,
             mtdSales: entry.mtdSales,
             monthlyGoal: entry.monthlyGoal,
+            workosUserId,
           }),
         ),
       )

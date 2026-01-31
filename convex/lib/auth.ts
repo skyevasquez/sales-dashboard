@@ -1,32 +1,45 @@
-import { authComponent } from "../auth";
-import { DataModel, Id } from "../_generated/dataModel";
-import type { GenericMutationCtx, GenericQueryCtx } from "convex/server";
+import { v } from "convex/values";
+import type { GenericQueryCtx, GenericMutationCtx } from "convex/server";
 
 type Viewer = {
   userId: string;
-  email?: string | null;
-  name?: string | null;
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
 };
 
-type DbCtx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>;
+type DbCtx = GenericQueryCtx<any> | GenericMutationCtx<any>;
 
-export async function getViewer(ctx: DbCtx) {
-  const user = await authComponent.getAuthUser(ctx);
+export async function getViewer(ctx: DbCtx): Promise<Viewer | null> {
+  return null;
+}
+
+export async function getViewerByWorkosId(ctx: DbCtx, workosUserId: string): Promise<Viewer | null> {
+  if (!workosUserId) {
+    return null;
+  }
+
+  const user = await ctx.db
+    .query("users")
+    .withIndex("by_workos_user_id", (q: any) => q.eq("workosUserId", workosUserId))
+    .unique();
+
   if (!user) {
     return null;
   }
 
   return {
-    userId: user.userId ?? user._id,
-    email: user.email ?? null,
-    name: user.name ?? null,
+    userId: user.workosUserId,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
   } satisfies Viewer;
 }
 
 export async function isSuperAdmin(ctx: DbCtx, userId: string) {
   const role = await ctx.db
     .query("appRoles")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
     .unique();
 
   return role?.role === "super_admin";
@@ -34,7 +47,7 @@ export async function isSuperAdmin(ctx: DbCtx, userId: string) {
 
 export async function assertOrgAccess(
   ctx: DbCtx,
-  orgId: Id<"organizations">,
+  orgId: string,
   viewer: Viewer,
 ) {
   if (await isSuperAdmin(ctx, viewer.userId)) {
@@ -43,7 +56,7 @@ export async function assertOrgAccess(
 
   const membership = await ctx.db
     .query("members")
-    .withIndex("by_org_user", (q) =>
+    .withIndex("by_org_user", (q: any) =>
       q.eq("orgId", orgId).eq("userId", viewer.userId),
     )
     .unique();
@@ -53,19 +66,18 @@ export async function assertOrgAccess(
   }
 }
 
-// Get user's role in an organization
 export async function getOrgRole(
   ctx: DbCtx,
-  orgId: Id<"organizations">,
+  orgId: string,
   userId: string,
 ): Promise<"owner" | "admin" | "member" | null> {
   if (await isSuperAdmin(ctx, userId)) {
-    return "owner"; // Super admins have owner-level access
+    return "owner";
   }
 
   const membership = await ctx.db
     .query("members")
-    .withIndex("by_org_user", (q) =>
+    .withIndex("by_org_user", (q: any) =>
       q.eq("orgId", orgId).eq("userId", userId),
     )
     .unique();
@@ -73,11 +85,9 @@ export async function getOrgRole(
   return membership?.role ?? null;
 }
 
-// Check if user has at least the required role level
-// owner > admin > member
 export async function assertOrgRole(
   ctx: DbCtx,
-  orgId: Id<"organizations">,
+  orgId: string,
   viewer: Viewer,
   requiredRole: "owner" | "admin" | "member",
 ) {

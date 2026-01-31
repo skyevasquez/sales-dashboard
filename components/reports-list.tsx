@@ -9,7 +9,7 @@ import type { Id } from "@/convex/_generated/dataModel"
 interface ReportsListProps {
   reports: Report[]
   stores: Store[]
-  onDeleteReport: (reportId: Id<"reports">) => void
+  onDeleteReport: (reportId: string) => void
   onExportCsv?: () => void
   canDelete?: boolean
 }
@@ -18,7 +18,7 @@ export function ReportsList({ reports, stores, onDeleteReport, onExportCsv, canD
   // Sort reports by creation date (newest first)
   const sortedReports = [...reports].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
-  const getStoreNames = (storeIds: Id<"stores">[]) => {
+  const getStoreNames = (storeIds: string[]) => {
     if (storeIds.length === 0) return "All Stores"
 
     return storeIds.map((id) => stores.find((store) => store.id === id)?.name || "Unknown Store").join(", ")

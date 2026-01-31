@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@workos-inc/authkit-nextjs/client';
+import { useAuth } from '@workos-inc/authkit-nextjs/components';
 import { SalesDashboard } from '@/components/sales-dashboard';
 import { WorkOSProtectedRoute } from '@/components/auth/workos-protected-route';
 import { WorkOSUserMenu } from '@/components/auth/workos-user-menu';

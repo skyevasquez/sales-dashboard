@@ -1,11 +1,16 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import { getViewer, isSuperAdmin } from "./lib/auth";
+import { mutation, query, internalMutation } from "./_generated/server";
+import { getViewerByWorkosId, isSuperAdmin } from "./lib/auth";
+
+const BOOTSTRAP_ADMIN_EMAIL = "skye@applylogics.com";
 
 export const getMyRole = query({
-  args: {},
-  handler: async (ctx) => {
-    const viewer = await getViewer(ctx);
+  args: { workosUserId: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    if (!args.workosUserId) {
+      return null;
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       return null;
     }
@@ -20,9 +25,12 @@ export const getMyRole = query({
 });
 
 export const bootstrapSuperAdmin = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const viewer = await getViewer(ctx);
+  args: { workosUserId: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    if (!args.workosUserId) {
+      throw new Error("Unauthorized: workosUserId required");
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       throw new Error("Unauthorized");
     }
@@ -42,9 +50,12 @@ export const bootstrapSuperAdmin = mutation({
 });
 
 export const bootstrapSuperAdminForEmail = mutation({
-  args: { email: v.string() },
+  args: { email: v.string(), workosUserId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      throw new Error("Unauthorized: workosUserId required");
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       throw new Error("Unauthorized");
     }
@@ -71,9 +82,13 @@ export const setUserRole = mutation({
   args: {
     userId: v.string(),
     role: v.union(v.literal("user"), v.literal("super_admin")),
+    workosUserId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      throw new Error("Unauthorized: workosUserId required");
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       throw new Error("Unauthorized");
     }
@@ -98,5 +113,33 @@ export const setUserRole = mutation({
     });
 
     return { userId: args.userId, role: args.role };
+  },
+});
+
+export const initializeAdminOnLogin = internalMutation({
+  args: { workosUserId: v.string(), email: v.string() },
+  handler: async (ctx, args) => {
+    if (args.email.toLowerCase() !== BOOTSTRAP_ADMIN_EMAIL.toLowerCase()) {
+      return { isAdmin: false };
+    }
+
+    const existingRole = await ctx.db
+      .query("appRoles")
+      .withIndex("by_user", (q) => q.eq("userId", args.workosUserId))
+      .first();
+
+    if (existingRole) {
+      if (existingRole.role !== "super_admin") {
+        await ctx.db.patch(existingRole._id, { role: "super_admin" });
+      }
+      return { isAdmin: true, existing: true };
+    }
+
+    await ctx.db.insert("appRoles", {
+      userId: args.workosUserId,
+      role: "super_admin",
+    });
+
+    return { isAdmin: true, existing: false };
   },
 });

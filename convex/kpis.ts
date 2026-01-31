@@ -1,13 +1,16 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { assertOrgAccess, assertOrgRole, getViewer } from "./lib/auth";
+import { assertOrgAccess, assertOrgRole, getViewerByWorkosId } from "./lib/auth";
 
 export const listKpis = query({
-  args: { orgId: v.id("organizations") },
+  args: { orgId: v.string(), workosUserId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      return [];
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
-      throw new Error("Unauthorized");
+      return [];
     }
 
     await assertOrgAccess(ctx, args.orgId, viewer);
@@ -20,9 +23,12 @@ export const listKpis = query({
 });
 
 export const createKpi = mutation({
-  args: { orgId: v.id("organizations"), name: v.string() },
+  args: { orgId: v.string(), name: v.string(), workosUserId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      throw new Error("Unauthorized: workosUserId required");
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       throw new Error("Unauthorized");
     }
@@ -38,9 +44,12 @@ export const createKpi = mutation({
 });
 
 export const deleteKpi = mutation({
-  args: { orgId: v.id("organizations"), kpiId: v.id("kpis") },
+  args: { orgId: v.string(), kpiId: v.string(), workosUserId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      throw new Error("Unauthorized: workosUserId required");
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       throw new Error("Unauthorized");
     }
@@ -48,11 +57,11 @@ export const deleteKpi = mutation({
     // Require admin or owner role to delete KPIs
     await assertOrgRole(ctx, args.orgId, viewer, "admin");
 
-    const kpi = await ctx.db.get(args.kpiId);
-    if (!kpi || kpi.orgId !== args.orgId) {
+    const kpi = await ctx.db.get(args.kpiId as any);
+    if (!kpi || (kpi as any).orgId !== args.orgId) {
       throw new Error("KPI not found");
     }
 
-    await ctx.db.delete(args.kpiId);
+    await ctx.db.delete(args.kpiId as any);
   },
 });

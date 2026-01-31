@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { authClient } from "@/lib/auth-client";
+import { useAuth } from "@workos-inc/authkit-nextjs/components";
 import { Loader2 } from "lucide-react";
 
 interface ProtectedRouteProps {
@@ -10,16 +10,16 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { data: session, isPending } = authClient.useSession();
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isPending && !session) {
+    if (!loading && !user) {
       router.push("/auth");
     }
-  }, [isPending, router, session]);
+  }, [loading, router, user]);
 
-  if (isPending) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -27,7 +27,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (!session) {
+  if (!user) {
     return null;
   }
 

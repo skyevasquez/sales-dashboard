@@ -1,13 +1,16 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { assertOrgAccess, assertOrgRole, getViewer } from "./lib/auth";
+import { assertOrgAccess, assertOrgRole, getViewerByWorkosId } from "./lib/auth";
 
 export const listStores = query({
-  args: { orgId: v.id("organizations") },
+  args: { orgId: v.string(), workosUserId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      return [];
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
-      throw new Error("Unauthorized");
+      return [];
     }
 
     await assertOrgAccess(ctx, args.orgId, viewer);
@@ -20,9 +23,12 @@ export const listStores = query({
 });
 
 export const createStore = mutation({
-  args: { orgId: v.id("organizations"), name: v.string() },
+  args: { orgId: v.string(), name: v.string(), workosUserId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      throw new Error("Unauthorized: workosUserId required");
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       throw new Error("Unauthorized");
     }
@@ -38,9 +44,12 @@ export const createStore = mutation({
 });
 
 export const deleteStore = mutation({
-  args: { orgId: v.id("organizations"), storeId: v.id("stores") },
+  args: { orgId: v.string(), storeId: v.string(), workosUserId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      throw new Error("Unauthorized: workosUserId required");
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       throw new Error("Unauthorized");
     }
@@ -48,11 +57,11 @@ export const deleteStore = mutation({
     // Require admin or owner role to delete stores
     await assertOrgRole(ctx, args.orgId, viewer, "admin");
 
-    const store = await ctx.db.get(args.storeId);
-    if (!store || store.orgId !== args.orgId) {
+    const store = await ctx.db.get(args.storeId as any);
+    if (!store || (store as any).orgId !== args.orgId) {
       throw new Error("Store not found");
     }
 
-    await ctx.db.delete(args.storeId);
+    await ctx.db.delete(args.storeId as any);
   },
 });

@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { assertOrgAccess, getViewer, isSuperAdmin } from "./lib/auth";
+import { assertOrgAccess, getViewerByWorkosId, isSuperAdmin } from "./lib/auth";
 
 function toSlug(value: string) {
   return value
@@ -11,11 +11,15 @@ function toSlug(value: string) {
 }
 
 export const listOrganizations = query({
-  args: {},
-  handler: async (ctx) => {
-    const viewer = await getViewer(ctx);
+  args: { workosUserId: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    if (!args.workosUserId) {
+      return [];
+    }
+
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
-      throw new Error("Unauthorized");
+      return [];
     }
 
     if (await isSuperAdmin(ctx, viewer.userId)) {
@@ -28,7 +32,7 @@ export const listOrganizations = query({
       .collect();
 
     const organizations = await Promise.all(
-      memberships.map((membership) => ctx.db.get(membership.orgId)),
+      memberships.map((membership) => ctx.db.get(membership.orgId as any)),
     );
 
     return organizations.filter((org) => org !== null);
@@ -36,15 +40,18 @@ export const listOrganizations = query({
 });
 
 export const getOrganization = query({
-  args: { orgId: v.id("organizations") },
+  args: { orgId: v.string(), workosUserId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      return null;
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
-      throw new Error("Unauthorized");
+      return null;
     }
 
     await assertOrgAccess(ctx, args.orgId, viewer);
-    return await ctx.db.get(args.orgId);
+    return await ctx.db.get(args.orgId as any);
   },
 });
 
@@ -52,9 +59,13 @@ export const createOrganization = mutation({
   args: {
     name: v.string(),
     slug: v.optional(v.string()),
+    workosUserId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      throw new Error("Unauthorized: workosUserId required");
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       throw new Error("Unauthorized");
     }

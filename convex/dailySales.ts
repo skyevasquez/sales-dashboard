@@ -1,16 +1,20 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { assertOrgAccess, getViewer } from "./lib/auth";
+import { assertOrgAccess, getViewerByWorkosId } from "./lib/auth";
 
 export const getSalesSummary = query({
   args: {
-    orgId: v.id("organizations"),
+    orgId: v.string(),
     monthKey: v.string(),
+    workosUserId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      return [];
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
-      throw new Error("Unauthorized");
+      return [];
     }
 
     await assertOrgAccess(ctx, args.orgId, viewer);
@@ -47,16 +51,20 @@ export const getSalesSummary = query({
 
 export const upsertFromMtd = mutation({
   args: {
-    orgId: v.id("organizations"),
-    storeId: v.id("stores"),
-    kpiId: v.id("kpis"),
+    orgId: v.string(),
+    storeId: v.string(),
+    kpiId: v.string(),
     dateKey: v.string(),
     monthKey: v.string(),
     mtdSales: v.number(),
     monthlyGoal: v.number(),
+    workosUserId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      throw new Error("Unauthorized: workosUserId required");
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       throw new Error("Unauthorized");
     }

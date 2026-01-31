@@ -44,7 +44,7 @@ export function GenerateReportDialog({
   onReportGenerated,
 }: GenerateReportDialogProps) {
   const [reportName, setReportName] = useState(`Sales Report - ${new Date().toLocaleDateString()}`)
-  const [selectedStores, setSelectedStores] = useState<Id<"stores">[]>([])
+  const [selectedStores, setSelectedStores] = useState<string[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,7 +70,7 @@ export function GenerateReportDialog({
     }
   }
 
-  const toggleStore = (storeId: Id<"stores">) => {
+  const toggleStore = (storeId: string) => {
     setSelectedStores((prev) => (prev.includes(storeId) ? prev.filter((id) => id !== storeId) : [...prev, storeId]))
   }
 

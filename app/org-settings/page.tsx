@@ -2,8 +2,8 @@
 
 import { useOrganization } from "@/components/organization/organization-context"
 import { OrgMemberManager } from "@/components/organization/org-member-manager"
-import { ProtectedRoute } from "@/components/auth/protected-route"
-import { UserMenu } from "@/components/auth/user-menu"
+import { WorkOSProtectedRoute } from "@/components/auth/workos-protected-route"
+import { WorkOSUserMenu } from "@/components/auth/workos-user-menu"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Building2, Users, Shield } from "lucide-react"
 
@@ -11,11 +11,11 @@ export default function OrgSettingsPage() {
   const { selectedOrg, myRole } = useOrganization()
 
   return (
-    <ProtectedRoute>
+    <WorkOSProtectedRoute>
       <main className="container mx-auto p-4">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Organization Settings</h1>
-          <UserMenu />
+          <WorkOSUserMenu />
         </div>
 
         {!selectedOrg ? (
@@ -74,6 +74,6 @@ export default function OrgSettingsPage() {
           </div>
         )}
       </main>
-    </ProtectedRoute>
+    </WorkOSProtectedRoute>
   )
 }

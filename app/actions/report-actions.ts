@@ -3,26 +3,34 @@
 import { put } from "@vercel/blob"
 import { jsPDF } from "jspdf"
 import type { Store, Kpi, SalesData } from "@/components/sales-dashboard"
-import type { Id } from "@/convex/_generated/dataModel"
+import { ConvexHttpClient } from "convex/browser"
 import { api } from "@/convex/_generated/api"
-import { fetchAuthMutation, fetchAuthQuery } from "@/lib/auth-server"
+import { withAuth } from "@workos-inc/authkit-nextjs"
+
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 
 // Type for our report metadata
 export interface Report {
-  id: Id<"reports">
+  id: string
   name: string
   createdAt: string
   url: string
-  storeIds: Id<"stores">[]
+  storeIds: string[]
 }
 
-async function resolveOrgId() {
-  const organizations = await fetchAuthQuery(api.organizations.listOrganizations, {})
-  const orgId = organizations?.[0]?._id ?? null
-  if (!orgId) {
-    throw new Error("Organization not found")
+async function getOrgIdForUser(): Promise<string> {
+  const auth = await withAuth()
+  if (!auth.user) {
+    throw new Error("Unauthorized")
   }
-  return orgId
+  
+  // Get user's organizations from Convex
+  const organizations = await convex.query(api.organizations.listOrganizations, {})
+  if (!organizations || organizations.length === 0) {
+    throw new Error("No organization found")
+  }
+  
+  return organizations[0]._id
 }
 
 // Function to generate a PDF report and store it in Vercel Blob
@@ -123,13 +131,13 @@ export async function generateReport(
     // Upload to Vercel Blob
     const { url } = await put(filename, pdfBlob, { access: "public" })
 
-    const orgId = await resolveOrgId()
+    const orgId = await getOrgIdForUser()
     const createdAt = new Date().toISOString()
-    const reportId = await fetchAuthMutation(api.reports.createReport, {
+    const reportId = await convex.mutation(api.reports.createReport, {
       orgId,
       name: reportName,
       url,
-      storeIds: selectedStoreIds as Id<"stores">[],
+      storeIds: selectedStoreIds,
     })
 
     const report: Report = {
@@ -137,7 +145,7 @@ export async function generateReport(
       name: reportName,
       createdAt,
       url,
-      storeIds: selectedStoreIds as Id<"stores">[],
+      storeIds: selectedStoreIds,
     }
 
     return { success: true, report }
@@ -147,11 +155,16 @@ export async function generateReport(
   }
 }
 
-// Function to get all reports from Appwrite
+// Function to get all reports
 export async function getAllReports() {
   try {
-    const orgId = await resolveOrgId()
-    const response = await fetchAuthQuery(api.reports.listReports, { orgId })
+    const auth = await withAuth()
+    if (!auth.user) {
+      throw new Error("Unauthorized")
+    }
+
+    const orgId = await getOrgIdForUser()
+    const response = await convex.query(api.reports.listReports, { orgId })
     const reports: Report[] = response.map((doc: (typeof response)[number]) => ({
       id: doc._id,
       name: doc.name,

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getViewer, isSuperAdmin, assertOrgAccess, getOrgRole } from "./lib/auth";
+import { getViewerByWorkosId, isSuperAdmin, assertOrgAccess, getOrgRole } from "./lib/auth";
 
 // Helper to get user by ID from Better Auth users table
 async function getUserById(ctx: any, userId: string): Promise<{ name?: string | null; email?: string | null } | null> {
@@ -31,12 +31,16 @@ async function findUserByEmail(ctx: any, email: string): Promise<{ userId: strin
 // List all members of an organization
 export const listMembers = query({
   args: {
-    orgId: v.id("organizations"),
+    orgId: v.string(),
+    workosUserId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      return [];
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
-      throw new Error("Unauthorized");
+      return [];
     }
 
     await assertOrgAccess(ctx, args.orgId, viewer);
@@ -69,10 +73,14 @@ export const listMembers = query({
 // Get current user's role in a specific organization
 export const getMyOrgRole = query({
   args: {
-    orgId: v.id("organizations"),
+    orgId: v.string(),
+    workosUserId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      return null;
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       return null;
     }
@@ -84,12 +92,16 @@ export const getMyOrgRole = query({
 // Invite a member to an organization
 export const inviteMember = mutation({
   args: {
-    orgId: v.id("organizations"),
+    orgId: v.string(),
     email: v.string(),
     role: v.union(v.literal("admin"), v.literal("member")),
+    workosUserId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      throw new Error("Unauthorized: workosUserId required");
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       throw new Error("Unauthorized");
     }
@@ -135,12 +147,16 @@ export const inviteMember = mutation({
 // Update a member's role
 export const updateMemberRole = mutation({
   args: {
-    orgId: v.id("organizations"),
-    memberId: v.id("members"),
+    orgId: v.string(),
+    memberId: v.string(),
     role: v.union(v.literal("owner"), v.literal("admin"), v.literal("member")),
+    workosUserId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      throw new Error("Unauthorized: workosUserId required");
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       throw new Error("Unauthorized");
     }
@@ -153,13 +169,13 @@ export const updateMemberRole = mutation({
     }
 
     // Get the member being updated
-    const member = await ctx.db.get(args.memberId);
-    if (!member || member.orgId !== args.orgId) {
+    const member = await ctx.db.get(args.memberId as any);
+    if (!member || (member as any).orgId !== args.orgId) {
       throw new Error("Member not found");
     }
 
     // Prevent removing the last owner
-    if (member.role === "owner" && args.role !== "owner") {
+    if ((member as any).role === "owner" && args.role !== "owner") {
       const members = await ctx.db
         .query("members")
         .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
@@ -170,7 +186,7 @@ export const updateMemberRole = mutation({
       }
     }
 
-    await ctx.db.patch(args.memberId, { role: args.role });
+    await ctx.db.patch(args.memberId as any, { role: args.role });
     return { success: true };
   },
 });
@@ -178,24 +194,28 @@ export const updateMemberRole = mutation({
 // Remove a member from an organization
 export const removeMember = mutation({
   args: {
-    orgId: v.id("organizations"),
-    memberId: v.id("members"),
+    orgId: v.string(),
+    memberId: v.string(),
+    workosUserId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      throw new Error("Unauthorized: workosUserId required");
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       throw new Error("Unauthorized");
     }
 
-    const memberToRemove = await ctx.db.get(args.memberId);
-    if (!memberToRemove || memberToRemove.orgId !== args.orgId) {
+    const memberToRemove = await ctx.db.get(args.memberId as any);
+    if (!memberToRemove || (memberToRemove as any).orgId !== args.orgId) {
       throw new Error("Member not found");
     }
 
     const viewerRole = await getOrgRole(ctx, args.orgId, viewer.userId);
-    const isSelf = memberToRemove.userId === viewer.userId;
-    const isRemovingAdmin = memberToRemove.role === "admin";
-    const isRemovingOwner = memberToRemove.role === "owner";
+    const isSelf = (memberToRemove as any).userId === viewer.userId;
+    const isRemovingAdmin = (memberToRemove as any).role === "admin";
+    const isRemovingOwner = (memberToRemove as any).role === "owner";
 
     // Permissions:
     // - Owner: can remove admins and members, but not other owners
@@ -217,7 +237,7 @@ export const removeMember = mutation({
     }
 
     // Prevent removing the last owner
-    if (memberToRemove.role === "owner") {
+    if ((memberToRemove as any).role === "owner") {
       const members = await ctx.db
         .query("members")
         .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
@@ -228,7 +248,7 @@ export const removeMember = mutation({
       }
     }
 
-    await ctx.db.delete(args.memberId);
+    await ctx.db.delete(args.memberId as any);
     return { success: true };
   },
 });
@@ -236,10 +256,14 @@ export const removeMember = mutation({
 // Leave an organization (for self-removal)
 export const leaveOrganization = mutation({
   args: {
-    orgId: v.id("organizations"),
+    orgId: v.string(),
+    workosUserId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const viewer = await getViewer(ctx);
+    if (!args.workosUserId) {
+      throw new Error("Unauthorized: workosUserId required");
+    }
+    const viewer = await getViewerByWorkosId(ctx, args.workosUserId);
     if (!viewer) {
       throw new Error("Unauthorized");
     }

@@ -12,7 +12,7 @@ export default defineSchema({
     .index("by_owner", ["ownerId"]),
 
   members: defineTable({
-    orgId: v.id("organizations"),
+    orgId: v.string(),
     userId: v.string(),
     role: v.union(v.literal("owner"), v.literal("admin"), v.literal("member")),
     joinedAt: v.number(),
@@ -26,22 +26,31 @@ export default defineSchema({
     role: v.union(v.literal("user"), v.literal("super_admin")),
   }).index("by_user", ["userId"]),
 
+  users: defineTable({
+    workosUserId: v.string(),
+    email: v.string(),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  }).index("by_workos_user_id", ["workosUserId"]),
+
   stores: defineTable({
-    orgId: v.id("organizations"),
+    orgId: v.string(),
     name: v.string(),
     createdAt: v.number(),
   }).index("by_org", ["orgId"]),
 
   kpis: defineTable({
-    orgId: v.id("organizations"),
+    orgId: v.string(),
     name: v.string(),
     createdAt: v.number(),
   }).index("by_org", ["orgId"]),
 
   daily_sales: defineTable({
-    orgId: v.id("organizations"),
-    storeId: v.id("stores"),
-    kpiId: v.id("kpis"),
+    orgId: v.string(),
+    storeId: v.string(),
+    kpiId: v.string(),
     dateKey: v.string(),
     monthKey: v.string(),
     dailyValue: v.number(),
@@ -56,9 +65,9 @@ export default defineSchema({
     .index("by_org_month", ["orgId", "monthKey"]),
 
   monthly_rollups: defineTable({
-    orgId: v.id("organizations"),
-    storeId: v.id("stores"),
-    kpiId: v.id("kpis"),
+    orgId: v.string(),
+    storeId: v.string(),
+    kpiId: v.string(),
     monthKey: v.string(),
     totalSales: v.number(),
     monthlyGoal: v.number(),
@@ -69,10 +78,10 @@ export default defineSchema({
     .index("by_org_store_kpi_month", ["orgId", "storeId", "kpiId", "monthKey"]),
 
   reports: defineTable({
-    orgId: v.id("organizations"),
+    orgId: v.string(),
     name: v.string(),
     url: v.string(),
-    storeIds: v.array(v.id("stores")),
+    storeIds: v.array(v.string()),
     createdAt: v.number(),
   }).index("by_org", ["orgId"]),
 });

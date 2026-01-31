@@ -1,13 +1,8 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { ConvexReactClient } from 'convex/react'
-import { ConvexBetterAuthProvider } from '@convex-dev/better-auth/react'
-import { authClient } from '@/lib/auth-client'
-import { OrganizationProvider } from './organization/organization-context'
-import { Toaster } from '@/components/ui/sonner'
+import { ConvexProvider, ConvexReactClient } from 'convex/react'
 
-// Defensive: fail gracefully if env var is missing instead of crashing module load
 const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL
 
 function getConvexClient(): ConvexReactClient | null {
@@ -18,17 +13,15 @@ function getConvexClient(): ConvexReactClient | null {
     )
     return null
   }
-  return new ConvexReactClient(CONVEX_URL, { expectAuth: true })
+  return new ConvexReactClient(CONVEX_URL)
 }
 
 const convex = getConvexClient()
 
 export function ConvexClientProvider({
   children,
-  initialToken,
 }: {
   children: ReactNode
-  initialToken?: string | null
 }) {
   if (!convex) {
     return (
@@ -43,16 +36,5 @@ export function ConvexClientProvider({
     )
   }
 
-  return (
-    <ConvexBetterAuthProvider
-      client={convex}
-      authClient={authClient}
-      initialToken={initialToken}
-    >
-      <OrganizationProvider>
-        {children}
-        <Toaster />
-      </OrganizationProvider>
-    </ConvexBetterAuthProvider>
-  )
+  return <ConvexProvider client={convex}>{children}</ConvexProvider>
 }

@@ -1,16 +1,17 @@
 'use client';
 
-import { useAuth } from '@workos-inc/authkit-nextjs/client';
+import { getSignInUrl } from '@workos-inc/authkit-nextjs';
 import { Button } from '@/components/ui/button';
 import { LogIn } from 'lucide-react';
 
 export function WorkOSSignInButton() {
-  const { signIn } = useAuth();
-
   return (
-    <Button onClick={() => signIn()} className="gap-2">
-      <LogIn className="h-4 w-4" />
-      Sign In
+    <Button onClick={async () => {
+      const signInUrl = await getSignInUrl();
+      window.location.href = signInUrl;
+    }} className="gap-2" size="lg">
+      <LogIn className="h-5 w-5" />
+      Sign In with WorkOS
     </Button>
   );
 }
