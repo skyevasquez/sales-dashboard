@@ -11,10 +11,18 @@ function getConvexClient() {
   return new ConvexHttpClient(url);
 }
 
+function getBaseURL() {
+  const redirectUri = process.env.WORKOS_REDIRECT_URI;
+  if (redirectUri) {
+    return redirectUri.replace('/auth/callback', '');
+  }
+  return 'https://brown-eel-742901.hostingersite.com';
+}
+
 export const GET = handleAuth({
   returnPathname: '/',
+  baseURL: getBaseURL(),
   onSuccess: async ({ user }) => {
-    // Don't block auth flow if Convex sync fails
     const convex = getConvexClient();
     if (!convex) {
       console.error('Skipping Convex sync - client not available');
@@ -38,7 +46,6 @@ export const GET = handleAuth({
         console.log(`Admin access granted to ${user.email}`);
       }
     } catch (error) {
-      // Log but don't throw - allow auth to complete even if Convex fails
       console.error('Failed to sync user to Convex:', error);
     }
   },
