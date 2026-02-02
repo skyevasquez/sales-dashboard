@@ -5,7 +5,8 @@ import { api } from '@/convex/_generated/api';
 function getConvexClient() {
   const url = process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!url) {
-    throw new Error('NEXT_PUBLIC_CONVEX_URL is not set');
+    console.error('NEXT_PUBLIC_CONVEX_URL is not set');
+    return null;
   }
   return new ConvexHttpClient(url);
 }
@@ -13,9 +14,14 @@ function getConvexClient() {
 export const GET = handleAuth({
   returnPathname: '/',
   onSuccess: async ({ user }) => {
+    // Don't block auth flow if Convex sync fails
+    const convex = getConvexClient();
+    if (!convex) {
+      console.error('Skipping Convex sync - client not available');
+      return;
+    }
+
     try {
-      const convex = getConvexClient();
-      
       await convex.mutation(api.users.upsertUser, {
         workosUserId: user.id,
         email: user.email,
@@ -32,6 +38,7 @@ export const GET = handleAuth({
         console.log(`Admin access granted to ${user.email}`);
       }
     } catch (error) {
+      // Log but don't throw - allow auth to complete even if Convex fails
       console.error('Failed to sync user to Convex:', error);
     }
   },
