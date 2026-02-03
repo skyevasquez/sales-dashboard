@@ -1,20 +1,21 @@
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 import { NextResponse, type NextRequest } from 'next/server';
 
+const env = process.env as Record<string, string | undefined>;
 const siteUrl =
-  process.env.SITE_URL ||
-  process.env.NEXT_PUBLIC_CONVEX_SITE_URL ||
+  env["SITE_URL"] ||
+  env["NEXT_PUBLIC_CONVEX_SITE_URL"] ||
   'https://applogic.space';
 const normalizedSiteUrl = siteUrl.replace(/\/$/, '');
 const redirectUri =
-  process.env.WORKOS_REDIRECT_URI ||
+  env["WORKOS_REDIRECT_URI"] ||
   `${normalizedSiteUrl}/auth/callback`;
 
 const hasAuthEnv =
-  !!process.env.WORKOS_API_KEY &&
-  !!process.env.WORKOS_CLIENT_ID &&
-  !!process.env.WORKOS_COOKIE_PASSWORD &&
-  !!process.env.WORKOS_REDIRECT_URI;
+  !!env["WORKOS_API_KEY"] &&
+  !!env["WORKOS_CLIENT_ID"] &&
+  !!env["WORKOS_COOKIE_PASSWORD"] &&
+  !!env["WORKOS_REDIRECT_URI"];
 
 const handler = authkitMiddleware({ redirectUri });
 
