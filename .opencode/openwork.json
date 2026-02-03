@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "workspace": {
+    "name": "sales-dashboard",
+    "createdAt": 1770065489904,
+    "preset": "starter"
+  },
+  "authorizedRoots": [
+    "/Users/skyevasquez/Desktop/Daily Targets/Calculator/sales-dashboard"
+  ]
+}

@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/react'
 import { AuthKitProvider } from '@workos-inc/authkit-nextjs/components'
 import { ConvexClientProvider } from '@/components/convex-client-provider'
 import { OrganizationProvider } from '@/components/organization/organization-context'
+import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -22,7 +23,7 @@ export default async function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark" style={{ colorScheme: 'dark' }}>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <style>{`
  html {
@@ -33,13 +34,20 @@ export default async function RootLayout({
         `}</style>
       </head>
       <body>
-        <AuthKitProvider>
-          <ConvexClientProvider>
-            <OrganizationProvider>
-              {children}
-            </OrganizationProvider>
-          </ConvexClientProvider>
-        </AuthKitProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthKitProvider>
+            <ConvexClientProvider>
+              <OrganizationProvider>
+                {children}
+              </OrganizationProvider>
+            </ConvexClientProvider>
+          </AuthKitProvider>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

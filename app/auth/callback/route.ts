@@ -16,7 +16,11 @@ function getBaseURL() {
   if (redirectUri) {
     return redirectUri.replace('/auth/callback', '');
   }
-  return 'https://brown-eel-742901.hostingersite.com';
+  const siteUrl =
+    process.env.SITE_URL ||
+    process.env.NEXT_PUBLIC_CONVEX_SITE_URL ||
+    'https://applogic.space';
+  return siteUrl.replace(/\/$/, '');
 }
 
 export const GET = handleAuth({

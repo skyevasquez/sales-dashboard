@@ -6,6 +6,7 @@ import { WorkOSProtectedRoute } from '@/components/auth/workos-protected-route';
 import { WorkOSUserMenu } from '@/components/auth/workos-user-menu';
 import { WorkOSSignInButton } from '@/components/auth/workos-sign-in-button';
 import { OrgSelector } from '@/components/organization/org-selector';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
@@ -22,6 +23,9 @@ export default function Home() {
   if (!user) {
     return (
       <main className="container mx-auto p-4">
+        <div className="flex justify-end">
+          <ThemeToggle />
+        </div>
         <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6">
           <h1 className="text-3xl font-bold text-center">Sales Performance Dashboard</h1>
           <p className="text-muted-foreground text-center">
@@ -39,7 +43,10 @@ export default function Home() {
         <div className="flex justify-between items-center mb-6">
           <OrgSelector />
           <h1 className="text-3xl font-bold text-center flex-1">Sales Performance Dashboard</h1>
-          <WorkOSUserMenu />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <WorkOSUserMenu />
+          </div>
         </div>
         <SalesDashboard />
       </main>
