@@ -173,4 +173,4 @@ This project is licensed under the MIT License.
 
 ---
 
-**Built with ❤️ using Next.js, Convex, and Better Auth**
+**Built with ❤️ using Next.js, Convex, and WorkOS Authkit**
