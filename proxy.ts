@@ -18,11 +18,20 @@ const hasAuthEnv =
 
 const handler = authkitMiddleware({ redirectUri });
 
-export default function proxy(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   if (!hasAuthEnv) {
     return NextResponse.next();
   }
-  return handler(request);
+  // Let the auth routes render their own diagnostics.
+  if (request.nextUrl.pathname.startsWith('/auth')) {
+    return NextResponse.next();
+  }
+  try {
+    return await handler(request);
+  } catch (error) {
+    console.error('AuthKit middleware failed:', error);
+    return NextResponse.next();
+  }
 }
 
 export const config = {
