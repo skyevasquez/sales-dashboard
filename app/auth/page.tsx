@@ -2,12 +2,6 @@ import { redirect } from "next/navigation";
 import { getSignInUrl, withAuth } from "@workos-inc/authkit-nextjs";
 
 export default async function AuthPage() {
-  const { user } = await withAuth();
-  
-  if (user) {
-    redirect("/");
-  }
-  
   const missing = [];
   if (!process.env.WORKOS_API_KEY) missing.push("WORKOS_API_KEY");
   if (!process.env.WORKOS_CLIENT_ID) missing.push("WORKOS_CLIENT_ID");
@@ -33,6 +27,25 @@ export default async function AuthPage() {
     );
   }
 
+  let user: { id: string } | null = null;
+  try {
+    ({ user } = await withAuth());
+  } catch (error) {
+    console.error("AuthKit failed to initialize:", error);
+    return (
+      <main className="container mx-auto p-6">
+        <h1 className="text-2xl font-semibold">Auth error</h1>
+        <p className="mt-2 text-muted-foreground">
+          AuthKit failed to initialize. Check server logs and env vars.
+        </p>
+      </main>
+    );
+  }
+  
+  if (user) {
+    redirect("/");
+  }
+  
   try {
     const signInUrl = await getSignInUrl();
     redirect(signInUrl);

@@ -1,4 +1,5 @@
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
+import { NextResponse, type NextRequest } from 'next/server';
 
 const siteUrl =
   process.env.SITE_URL ||
@@ -9,7 +10,20 @@ const redirectUri =
   process.env.WORKOS_REDIRECT_URI ||
   `${normalizedSiteUrl}/auth/callback`;
 
-export default authkitMiddleware({ redirectUri });
+const hasAuthEnv =
+  !!process.env.WORKOS_API_KEY &&
+  !!process.env.WORKOS_CLIENT_ID &&
+  !!process.env.WORKOS_COOKIE_PASSWORD &&
+  !!process.env.WORKOS_REDIRECT_URI;
+
+const handler = authkitMiddleware({ redirectUri });
+
+export default function proxy(request: NextRequest) {
+  if (!hasAuthEnv) {
+    return NextResponse.next();
+  }
+  return handler(request);
+}
 
 export const config = {
   matcher: [
