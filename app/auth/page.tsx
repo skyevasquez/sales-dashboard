@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 import { getSignInUrl, withAuth } from "@workos-inc/authkit-nextjs";
+import { ensureRuntimeEnv } from "@/lib/runtime-env";
 
 export default async function AuthPage() {
-  const env = process.env as Record<string, string | undefined>;
-  const missing: string[] = [];
-  if (!env["WORKOS_API_KEY"]) missing.push("WORKOS_API_KEY");
-  if (!env["WORKOS_CLIENT_ID"]) missing.push("WORKOS_CLIENT_ID");
-  if (!env["WORKOS_COOKIE_PASSWORD"]) missing.push("WORKOS_COOKIE_PASSWORD");
-  if (!env["WORKOS_REDIRECT_URI"]) missing.push("WORKOS_REDIRECT_URI");
+  const { missing } = ensureRuntimeEnv([
+    "WORKOS_API_KEY",
+    "WORKOS_CLIENT_ID",
+    "WORKOS_COOKIE_PASSWORD",
+    "WORKOS_REDIRECT_URI",
+  ]);
 
   if (missing.length > 0) {
     return (
