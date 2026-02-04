@@ -9,13 +9,14 @@ const siteUrl =
 const normalizedSiteUrl = siteUrl.replace(/\/$/, '');
 const redirectUri =
   env["WORKOS_REDIRECT_URI"] ||
+  env["NEXT_PUBLIC_WORKOS_REDIRECT_URI"] ||
   `${normalizedSiteUrl}/auth/callback`;
 
 const hasAuthEnv =
   !!env["WORKOS_API_KEY"] &&
   !!env["WORKOS_CLIENT_ID"] &&
   !!env["WORKOS_COOKIE_PASSWORD"] &&
-  !!env["WORKOS_REDIRECT_URI"];
+  (!!env["WORKOS_REDIRECT_URI"] || !!env["NEXT_PUBLIC_WORKOS_REDIRECT_URI"]);
 
 const handler = authkitMiddleware({ redirectUri });
 
