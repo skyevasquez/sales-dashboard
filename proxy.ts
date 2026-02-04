@@ -24,10 +24,6 @@ export default async function proxy(request: NextRequest) {
   if (!hasAuthEnv) {
     return NextResponse.next();
   }
-  // Let the auth routes render their own diagnostics.
-  if (request.nextUrl.pathname.startsWith('/auth')) {
-    return NextResponse.next();
-  }
   try {
     return await handler(request);
   } catch (error) {
