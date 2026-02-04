@@ -68,6 +68,9 @@ export default async function AuthPage() {
     const signInUrl = await getSignInUrl();
     redirect(signInUrl);
   } catch (error) {
+    if (String((error as { digest?: string }).digest || '').startsWith('NEXT_REDIRECT')) {
+      throw error;
+    }
     console.error("Failed to generate WorkOS sign-in URL:", error);
     return (
       <main className="container mx-auto p-6">
