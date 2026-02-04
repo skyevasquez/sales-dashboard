@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getSignInUrl, withAuth } from "@workos-inc/authkit-nextjs";
 import { ensureRuntimeEnv } from "@/lib/runtime-env";
 
+export const dynamic = "force-dynamic";
+
 export default async function AuthPage() {
   const { missing } = ensureRuntimeEnv([
     "WORKOS_API_KEY",
